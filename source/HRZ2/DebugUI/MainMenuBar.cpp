@@ -40,29 +40,29 @@ namespace HRZ2::DebugUI
 		// Empty space for MSI afterburner display
 		ImGui::BeginMenu("                        ", false);
 
-		// "Gameplay" menu
-		if (ImGui::BeginMenu("Gameplay"))
+		// Gameplay menu
+		if (ImGui::BeginMenu("游戏###Gameplay"))
 		{
 			DrawGameplayMenu();
 			ImGui::EndMenu();
 		}
 
-		// "Cheats" menu
-		if (ImGui::BeginMenu("Cheats", Player::GetLocalPlayer() != nullptr))
+		// Cheats menu
+		if (ImGui::BeginMenu("作弊###Cheats", Player::GetLocalPlayer() != nullptr))
 		{
 			DrawCheatsMenu();
 			ImGui::EndMenu();
 		}
 
-		// "Miscellaneous" menu
-		if (ImGui::BeginMenu("Miscellaneous"))
+		// Miscellaneous menu
+		if (ImGui::BeginMenu("其他###Miscellaneous"))
 		{
 			DrawMiscellaneousMenu();
 			ImGui::EndMenu();
 		}
 
 		// Credits
-		XorStr creditsBuf("Game keyboard input blocked | HFW Gameplay Tweaks & Cheat Menu by Nukem\0");
+		XorStr creditsBuf("游戏键盘输入已屏蔽 | HFW 游戏调整与作弊菜单，作者：Nukem\0");
 		auto credits = creditsBuf.Decrypt();
 
 		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(credits.data()).x);
@@ -83,15 +83,15 @@ namespace HRZ2::DebugUI
 
 	void MainMenuBar::DrawGameplayMenu()
 	{
-		ImGui::MenuItem("Pause Game Logic", nullptr, &m_PauseGame);
-		if (ImGui::MenuItem("Pause AI Processing", nullptr, m_PauseAIProcessing))
+		ImGui::MenuItem("暂停游戏逻辑###PauseGameLogic", nullptr, &m_PauseGame);
+		if (ImGui::MenuItem("暂停 AI 处理###PauseAIProcessing", nullptr, m_PauseAIProcessing))
 			TogglePauseAIProcessing();
 		ImGui::MenuItem("##sep1", nullptr, nullptr, false);
 
-		if (ImGui::MenuItem("Force Quick Save"))
+		if (ImGui::MenuItem("强制快速保存###ForceQuickSave"))
 			ToggleQuickSave();
 
-		if (ImGui::MenuItem("Force Load Previous Save"))
+		if (ImGui::MenuItem("强制读取上一存档###ForceLoadPreviousSave"))
 			ToggleQuickLoad();
 
 		// Day/night cycle
@@ -101,13 +101,13 @@ namespace HRZ2::DebugUI
 			{
 				ImGui::MenuItem("##sep2", nullptr, nullptr, false);
 
-				if (ImGui::MenuItem("Pause Time of Day", nullptr, worldTimeState->m_IsPaused))
+				if (ImGui::MenuItem("暂停昼夜时间###PauseTimeOfDay", nullptr, worldTimeState->m_IsPaused))
 					TogglePauseTimeOfDay();
 
-				if (ImGui::MenuItem("Pause Day/Night Cycle", nullptr, !worldTimeState->m_EnableDayNightCycle))
+				if (ImGui::MenuItem("暂停昼夜循环###PauseDayNightCycle", nullptr, !worldTimeState->m_EnableDayNightCycle))
 					worldTimeState->m_EnableDayNightCycle = !worldTimeState->m_EnableDayNightCycle;
 
-				ImGui::MenuItem("Time of Day", nullptr, nullptr, false);
+				ImGui::MenuItem("当前时间###TimeOfDay", nullptr, nullptr, false);
 				float timeOfDay = worldTimeState->m_TimeOfDay;
 
 				if (ImGui::SliderFloat("##timeofdaybar", &timeOfDay, 0.0f, 23.9999f))
@@ -117,10 +117,10 @@ namespace HRZ2::DebugUI
 
 		// Timescale
 		ImGui::MenuItem("##sep3", nullptr, nullptr, false);
-		ImGui::MenuItem("Enable Timescale Override in Menus", nullptr, &m_TimescaleOverrideInMenus);
-		if (ImGui::MenuItem("Enable Timescale Override", nullptr, m_TimescaleOverride))
+		ImGui::MenuItem("在菜单中也启用时间倍率覆盖###TimescaleOverrideInMenus", nullptr, &m_TimescaleOverrideInMenus);
+		if (ImGui::MenuItem("启用时间倍率覆盖###EnableTimescaleOverride", nullptr, m_TimescaleOverride))
 			ToggleTimescaleOverride();
-		ImGui::MenuItem("Timescale", nullptr, nullptr, false);
+		ImGui::MenuItem("时间倍率###Timescale", nullptr, nullptr, false);
 
 		auto modifyTimescale = [](float Scale, bool SameLine = true)
 		{
@@ -154,22 +154,22 @@ namespace HRZ2::DebugUI
 		if (!player || !player->m_Entity)
 			return;
 
-		if (ImGui::MenuItem("Enable Noclip", nullptr, m_FreeCamMode == FreeCamMode::Noclip))
+		if (ImGui::MenuItem("启用穿墙模式###EnableNoclip", nullptr, m_FreeCamMode == FreeCamMode::Noclip))
 			ToggleNoclip();
 
-		if (ImGui::MenuItem("Enable Free Camera", nullptr, m_FreeCamMode == FreeCamMode::Free))
+		if (ImGui::MenuItem("启用自由镜头###EnableFreeCamera", nullptr, m_FreeCamMode == FreeCamMode::Free))
 			ToggleFreeflyCamera();
 
 		if (auto destructibility = player->m_Entity->m_Destructibility)
 		{
-			if (ImGui::MenuItem("Enable God Mode", nullptr, &m_EnableGodMode))
+			if (ImGui::MenuItem("启用无敌模式###EnableGodMode", nullptr, &m_EnableGodMode))
 			{
 				m_EnableDemigodMode = false;
 				destructibility->m_Invulnerable = m_EnableGodMode;
 				destructibility->m_DieAtZeroHealth = true;
 			}
 
-			if (ImGui::MenuItem("Enable Demigod Mode", nullptr, &m_EnableDemigodMode))
+			if (ImGui::MenuItem("启用半无敌模式###EnableDemigodMode", nullptr, &m_EnableDemigodMode))
 			{
 				m_EnableGodMode = false;
 				destructibility->m_Invulnerable = false;
@@ -177,22 +177,22 @@ namespace HRZ2::DebugUI
 			}
 		}
 
-		if (ImGui::MenuItem("Enable Infinite Ammo", nullptr, &debugSettings->m_InfiniteAmmo))
+		if (ImGui::MenuItem("启用无限备用弹药###EnableInfiniteAmmo", nullptr, &debugSettings->m_InfiniteAmmo))
 		{
 			debugSettings->m_InfiniteSizeClip = false;
 			m_EnableInfiniteClipAmmo = false;
 		}
 
-		if (ImGui::MenuItem("Enable Infinite Ammo (Clip)", nullptr, &m_EnableInfiniteClipAmmo))
+		if (ImGui::MenuItem("启用无限弹匣弹药###EnableInfiniteClipAmmo", nullptr, &m_EnableInfiniteClipAmmo))
 		{
 			debugSettings->m_InfiniteAmmo = false;
 			debugSettings->m_InfiniteSizeClip = m_EnableInfiniteClipAmmo;
 		}
 
-		ImGui::MenuItem("Enable Infinite Stamina", nullptr, &debugSettings->m_Inexhaustible);
+		ImGui::MenuItem("启用无限武器耐力###EnableInfiniteStamina", nullptr, &debugSettings->m_Inexhaustible);
 		ImGui::MenuItem("##sep1", nullptr, nullptr, false);
 
-		if (ImGui::BeginMenu("Teleport To..."))
+		if (ImGui::BeginMenu("传送到……###TeleportTo"))
 		{
 			auto doTeleport = [&](const char *Name, WorldPosition Position)
 			{
@@ -221,39 +221,39 @@ namespace HRZ2::DebugUI
 				}
 			};
 
-			doTeleport("Free Camera Position", m_FreeCamPosition.Position);
+			doTeleport("自由镜头位置", m_FreeCamPosition.Position);
 			ImGui::MenuItem("##septeleport1", nullptr, nullptr, false);
-			doTeleport("HZD - Meridian Entrance", { 3918.612, 5465.897, 830.652 });
-			doTeleport("HZD - The Spire", { 4162.499, 4757.230, 774.453 });
-			doTeleport("HZD - The Estate", { 4082.374, 4614.900, 710.106 });
-			doTeleport("HZD - Gatelands", { 4695.546, 5482.825, 787.018 });
-			doTeleport("HZD - Lone Light", { 4772.899, 5777.062 , 780.938 });
-			doTeleport("HZD - Blazon Arch", { 3086.388, 5931.355, 813.258 });
-			doTeleport("HZD - Cauldron ZETA", { 4050.798, 6724.117, 840.551 });
-			doTeleport("HZD - Sunfall Arena", { 3009.000, 6565.725, 868.025 });
-			doTeleport("HZD - Maker's End", { 3435.481, 7210.677, 825.362 });
-			doTeleport("HZD - The Daunt", { 1662.439, 5811.224, 794.055 });
-			doTeleport("HZD - The Glarebreak", { 5260.463, 6411.703, 820.775 });
+			doTeleport("HZD - 子午城入口", { 3918.612, 5465.897, 830.652 });
+			doTeleport("HZD - 尖塔", { 4162.499, 4757.230, 774.453 });
+			doTeleport("HZD - 庄园", { 4082.374, 4614.900, 710.106 });
+			doTeleport("HZD - 门地", { 4695.546, 5482.825, 787.018 });
+			doTeleport("HZD - 孤光", { 4772.899, 5777.062 , 780.938 });
+			doTeleport("HZD - 炽焰拱门", { 3086.388, 5931.355, 813.258 });
+			doTeleport("HZD - 炼铸厂 ZETA", { 4050.798, 6724.117, 840.551 });
+			doTeleport("HZD - 日落之地竞技场", { 3009.000, 6565.725, 868.025 });
+			doTeleport("HZD - 造者末途", { 3435.481, 7210.677, 825.362 });
+			doTeleport("HZD - 丹特", { 1662.439, 5811.224, 794.055 });
+			doTeleport("HZD - 耀光峡谷", { 5260.463, 6411.703, 820.775 });
 			ImGui::MenuItem("##septeleport2", nullptr, nullptr, false);
-			doTeleport("HFW - Intro Cutscene 1", { 5737.400, -2394.600, 432.400 });
-			doTeleport("HFW - Intro Cutscene 2", { 6315.800, -1698.400, 320.100 });
-			doTeleport("HFW - Intro Cutscene 3", { 6942.200, -1713.900, 321.000 });
-			doTeleport("HFW - Intro Cutscene 4 (Tree Dream)", { 2691.584, -3752.680, 477.490 });
-			doTeleport("HFW - Intro Tutorial Area", { 5645.362, -2886.453, 403.551 });
-			doTeleport("HFW - Intro Far Zenith Facility", { 5993.999, -2915.253, 334.978 });
-			doTeleport("HFW - Intro Far Zenith Space Shuttle", { 6465.844, -3147.694, 331.482 });
-			doTeleport("HFW - Barren Light Mountain Fort", { 2690.644, 441.522, 677.341 });
-			doTeleport("HFW - Burning Shores Boss Battle Area", { -140.415, -4405.686, 291.182 });
-			doTeleport("HFW - Burning Shores Unfinished Area", { 2107.752, -6777.761, 302.759 });
-			doTeleport("HFW - Apex Hunt: The Westshallows", { -4531.792, -460.949, 185.629 });
-			doTeleport("HFW - Apex Hunt: The Graypeak", { -1452.500, -614.100, 520.100 });
-			doTeleport("HFW - Far Zenith Base", { -1417.900, -3088.700, 283.900 });
+			doTeleport("HFW - 开场过场动画 1", { 5737.400, -2394.600, 432.400 });
+			doTeleport("HFW - 开场过场动画 2", { 6315.800, -1698.400, 320.100 });
+			doTeleport("HFW - 开场过场动画 3", { 6942.200, -1713.900, 321.000 });
+			doTeleport("HFW - 开场过场动画 4（树之梦）", { 2691.584, -3752.680, 477.490 });
+			doTeleport("HFW - 序章教学区域", { 5645.362, -2886.453, 403.551 });
+			doTeleport("HFW - 序章法尔·泽尼斯设施", { 5993.999, -2915.253, 334.978 });
+			doTeleport("HFW - 序章法尔·泽尼斯航天飞机", { 6465.844, -3147.694, 331.482 });
+			doTeleport("HFW - 贫瘠之光山地要塞", { 2690.644, 441.522, 677.341 });
+			doTeleport("HFW - 炙炎海岸首领战区域", { -140.415, -4405.686, 291.182 });
+			doTeleport("HFW - 炙炎海岸未完成区域", { 2107.752, -6777.761, 302.759 });
+			doTeleport("HFW - 顶级猎杀：西浅滩", { -4531.792, -460.949, 185.629 });
+			doTeleport("HFW - 顶级猎杀：灰峰", { -1452.500, -614.100, 520.100 });
+			doTeleport("HFW - 法尔·泽尼斯基地", { -1417.900, -3088.700, 283.900 });
 
 			ImGui::EndMenu();
 		}
 
 		// Faction
-		if (ImGui::BeginMenu("Player Faction..."))
+		if (ImGui::BeginMenu("玩家阵营……###PlayerFaction"))
 		{
 			auto& modEvents = ModCoreEvents::GetInstance();
 			std::shared_lock lock(modEvents.m_CachedDataMutex);
@@ -286,41 +286,41 @@ namespace HRZ2::DebugUI
 			ImGui::EndMenu();
 		}
 
-		if (ImGui::MenuItem("Player Inventory..."))
+		if (ImGui::MenuItem("玩家物品栏……###PlayerInventory"))
 			AddWindow(std::make_shared<PlayerInventoryWindow>());
 
-		if (ImGui::MenuItem("Entity Spawner..."))
+		if (ImGui::MenuItem("实体生成器……###EntitySpawner"))
 			AddWindow(std::make_shared<EntitySpawnerWindow>());
 
-		if (ImGui::MenuItem("Weather Setup..."))
+		if (ImGui::MenuItem("天气设置……###WeatherSetup"))
 			AddWindow(std::make_shared<WeatherSetupWindow>());
 
 		ImGui::MenuItem("##sep2", nullptr, nullptr, false);
-		ImGui::MenuItem("Simulate Game Completed", nullptr, &debugSettings->m_SPAllUnlocked);
-		ImGui::MenuItem("Apply Photomode Settings Ingame", nullptr, &debugSettings->m_ApplyPhotoModeSettingsIngame);
+		ImGui::MenuItem("模拟游戏已完成###SimulateGameCompleted", nullptr, &debugSettings->m_SPAllUnlocked);
+		ImGui::MenuItem("在游戏中应用拍照模式设置###ApplyPhotomodeSettingsIngame", nullptr, &debugSettings->m_ApplyPhotoModeSettingsIngame);
 	}
 
 	void MainMenuBar::DrawMiscellaneousMenu()
 	{
-		if (ImGui::MenuItem("Show Log Window"))
+		if (ImGui::MenuItem("显示日志窗口###ShowLogWindow"))
 			AddWindow(std::make_shared<LogWindow>());
 
-		if (ImGui::MenuItem("Show ImGui Demo Window"))
+		if (ImGui::MenuItem("显示 ImGui 演示窗口（英文）###ShowImGuiDemoWindow"))
 			AddWindow(std::make_shared<DemoWindow>());
 
-		if (ImGui::MenuItem("Dump RTTI Structures", nullptr, false, !RTTIScanner::GetAllTypes().empty()))
+		if (ImGui::MenuItem("导出 RTTI 结构###DumpRTTIStructures", nullptr, false, !RTTIScanner::GetAllTypes().empty()))
 		{
 			RTTIYamlExporter exporter(RTTIScanner::GetAllTypes());
 			exporter.ExportRTTITypes(".");
 		}
 
 #if 0
-		if (ImGui::MenuItem("Dump Fullgame Typeinfo", nullptr, false, false))
+		if (ImGui::MenuItem("导出完整游戏类型信息###DumpFullgameTypeinfo", nullptr, false, false))
 		{
 		}
 #endif
 
-		if (ImGui::MenuItem("Dump Player Components"))
+		if (ImGui::MenuItem("导出玩家组件###DumpPlayerComponents"))
 		{
 			if (auto player = Player::GetLocalPlayer())
 			{
@@ -364,7 +364,7 @@ namespace HRZ2::DebugUI
 			static size_t loadingRootIndex = std::numeric_limits<size_t>::max();
 			static StreamingRefBase streamingRefRoot;
 
-			if (ImGui::MenuItem("Begin Instrumentation", nullptr, false, false) || instrumentationActive)
+			if (ImGui::MenuItem("开始检测###BeginInstrumentation", nullptr, false, false) || instrumentationActive)
 			{
 				auto& modEvents = ModCoreEvents::GetInstance();
 				auto& resourceList = modEvents.m_CachedInventoryItems;
@@ -432,9 +432,9 @@ namespace HRZ2::DebugUI
 		ImGui::MenuItem("##blankseparator0", nullptr, nullptr, false);
 
 		// LOD bias
-		if (ImGui::MenuItem("Enable LOD Bias Override", nullptr, m_LODRangeModifier != std::numeric_limits<float>::max()))
+		if (ImGui::MenuItem("启用 LOD 偏差覆盖###EnableLODBiasOverride", nullptr, m_LODRangeModifier != std::numeric_limits<float>::max()))
 			m_LODRangeModifier = m_LODRangeModifier == std::numeric_limits<float>::max() ? 1.0f : std::numeric_limits<float>::max();
-		ImGui::MenuItem("Bias", nullptr, nullptr, false);
+		ImGui::MenuItem("偏差###Bias", nullptr, nullptr, false);
 		if (float t = m_LODRangeModifier == std::numeric_limits<float>::max() ? 1.0f : m_LODRangeModifier;
 			ImGui::SliderFloat("##LODDragFloat", &t, 0.0f, 1.0f))
 			m_LODRangeModifier = t;
@@ -442,7 +442,7 @@ namespace HRZ2::DebugUI
 		ImGui::MenuItem("##blankseparator1", nullptr, nullptr, false);
 		ImGui::MenuItem("##blankseparator2", nullptr, nullptr, false);
 
-		if (ImGui::MenuItem("Terminate Process"))
+		if (ImGui::MenuItem("终止游戏进程###TerminateProcess"))
 			TerminateProcess(GetCurrentProcess(), 0);
 	}
 

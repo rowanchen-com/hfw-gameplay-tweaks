@@ -58,7 +58,7 @@ namespace HRZ2::DebugUI
 		}
 
 		// Draw weather setup list
-		m_SpawnerNameFilter.Draw();
+		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###WeatherSetupFilter");
 
 		if (ImGui::BeginListBox("##WeatherSetupSelector", ImVec2(-FLT_MIN, -100)))
 		{
@@ -92,7 +92,7 @@ namespace HRZ2::DebugUI
 		const bool setIsAllowed = m_LastSelectedIndex < ModConfiguration.CachedWeatherSetups.size();
 		ImGui::BeginDisabled(!setIsAllowed);
 
-		if ((ImGui::Button("Set") || m_DoSetOnNextFrame) && setIsAllowed)
+		if ((ImGui::Button("应用###Set") || m_DoSetOnNextFrame) && setIsAllowed)
 		{
 			m_NextWeatherSetupUUID = ModConfiguration.CachedWeatherSetups[m_LastSelectedIndex].UUID;
 
@@ -116,7 +116,7 @@ namespace HRZ2::DebugUI
 
 		ImGui::Spacing();
 		ImGui::PushTextWrapPos(0.0f);
-		ImGui::TextDisabled("Note: Names are missing. They can be manually added in the mod configuration file.");
+		ImGui::TextDisabled("注意：部分名称缺失，可以在模组配置文件中手动添加。");
 		ImGui::PopTextWrapPos();
 		ImGui::EndDisabled();
 		ImGui::End();
@@ -131,6 +131,6 @@ namespace HRZ2::DebugUI
 
 	std::string WeatherSetupWindow::GetId() const
 	{
-		return "Weather Setup";
+		return "天气设置###WeatherSetupWindow";
 	}
 }

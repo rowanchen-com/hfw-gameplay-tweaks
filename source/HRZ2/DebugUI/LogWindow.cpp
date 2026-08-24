@@ -13,23 +13,23 @@ namespace HRZ2::DebugUI
 		// Options menu
 		if (ImGui::BeginPopup("Options"))
 		{
-			ImGui::Checkbox("Auto-scroll", &m_AutoScroll);
+			ImGui::Checkbox("自动滚动###AutoScroll", &m_AutoScroll);
 			ImGui::EndPopup();
 		}
 
-		if (ImGui::Button("Options"))
+		if (ImGui::Button("选项###OptionsButton"))
 			ImGui::OpenPopup("Options");
 
 		// Main window
 		ImGui::SameLine();
-		if (ImGui::Button("Clear"))
+		if (ImGui::Button("清空###Clear"))
 			Clear();
 
 		ImGui::SameLine();
-		bool copy = ImGui::Button("Copy");
+		bool copy = ImGui::Button("复制###Copy");
 
 		ImGui::SameLine();
-		if (m_Filter.Draw("Filter", -100.0f))
+		if (m_Filter.Draw("筛选###Filter", -100.0f))
 			m_LineCountFilterCache = 0;
 
 		ImGui::Separator();
@@ -103,7 +103,7 @@ namespace HRZ2::DebugUI
 
 	std::string LogWindow::GetId() const
 	{
-		return "Log Window";
+		return "日志窗口###LogWindow";
 	}
 
 	void LogWindow::Clear()

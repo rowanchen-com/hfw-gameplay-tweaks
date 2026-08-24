@@ -32,7 +32,7 @@ namespace HRZ2::DebugUI
 		}
 
 		// Draw entity list
-		m_SpawnerNameFilter.Draw();
+		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###EntitySpawnerFilter");
 
 		if (ImGui::BeginListBox("##SpawnSetupSelector", ImVec2(-FLT_MIN, -200)))
 		{
@@ -80,7 +80,7 @@ namespace HRZ2::DebugUI
 			auto& modEvents = ModCoreEvents::GetInstance();
 			std::shared_lock lock(modEvents.m_CachedDataMutex);
 
-			String previewString = "<Unset Faction>";
+			String previewString = "<未指定阵营>";
 			
 			if (!modEvents.m_CachedAIFactions.contains(customFaction))
 				customFaction = nullptr;
@@ -98,7 +98,7 @@ namespace HRZ2::DebugUI
 						return A->GetMemberRefUnsafe<String>("Name") < B->GetMemberRefUnsafe<String>("Name");
 					});
 
-				if (ImGui::Selectable("<Unset Faction>", customFaction == nullptr))
+				if (ImGui::Selectable("<未指定阵营>###UnsetFaction", customFaction == nullptr))
 					customFaction = nullptr;
 
 				for (auto faction : sortedFactions)
@@ -117,9 +117,9 @@ namespace HRZ2::DebugUI
 		}
 		ImGui::PopItemWidth();
 		ImGui::Spacing();
-		ImGui::RadioButton("Spawn at player position", &spawnLocationType, 0);
-		ImGui::RadioButton("Spawn at crosshair position", &spawnLocationType, 1);
-		ImGui::RadioButton("Spawn at custom position", &spawnLocationType, 2);
+		ImGui::RadioButton("在玩家位置生成###SpawnAtPlayerPosition", &spawnLocationType, 0);
+		ImGui::RadioButton("在准星位置生成###SpawnAtCrosshairPosition", &spawnLocationType, 1);
+		ImGui::RadioButton("在自定义位置生成###SpawnAtCustomPosition", &spawnLocationType, 2);
 		ImGui::Spacing();
 
 		if (spawnLocationType == 2)
@@ -133,7 +133,7 @@ namespace HRZ2::DebugUI
 		}
 
 		// Spawn button
-		if (ImGui::Button("Spawn") || (m_DoSpawnOnNextFrame && allowSpawn))
+		if (ImGui::Button("生成###Spawn") || (m_DoSpawnOnNextFrame && allowSpawn))
 		{
 			m_NextSpawnTransform = GetSpawnTransform(spawnLocationType, customSpawnPosition);
 			m_NextSpawnSelectedIndex = m_LastSelectedSetupIndex;
@@ -143,8 +143,8 @@ namespace HRZ2::DebugUI
 
 		ImGui::Spacing();
 		ImGui::PushTextWrapPos(0.0f);
-		ImGui::TextDisabled("Note: Many humanoid and scripted entities will crash the game.");
-		ImGui::TextDisabled("Note: Names are missing. They can be manually added in the mod configuration file.");
+		ImGui::TextDisabled("注意：许多人形和脚本实体会导致游戏崩溃。");
+		ImGui::TextDisabled("注意：部分名称缺失，可以在模组配置文件中手动添加。");
 		ImGui::PopTextWrapPos();
 		ImGui::EndDisabled();
 		ImGui::End();
@@ -160,7 +160,7 @@ namespace HRZ2::DebugUI
 
 	std::string EntitySpawnerWindow::GetId() const
 	{
-		return "Entity Spawner";
+		return "实体生成器###EntitySpawnerWindow";
 	}
 
 	void EntitySpawnerWindow::RunSpawnCommands()

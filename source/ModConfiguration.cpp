@@ -121,10 +121,15 @@ namespace InternalModConfig
 			PARSE_TOML_MEMBER(general, EnableAssetLogging);
 			PARSE_TOML_MEMBER(general, EnableAssetOverrides);
 			PARSE_TOML_MEMBER(general, DebugMenuFontScale);
+			PARSE_TOML_MEMBER(general, DebugMenuFontPath);
+			PARSE_TOML_MEMBER(general, DebugMenuFontSize);
 		}
 
 		if (o.DebugMenuFontScale <= 0.0f)
 			o.DebugMenuFontScale = 1.0f;
+
+		if (o.DebugMenuFontSize <= 0.0f)
+			o.DebugMenuFontSize = 16.0f;
 
 		// [Gameplay]
 		if (auto gameplay = Table["Gameplay"].as_table())

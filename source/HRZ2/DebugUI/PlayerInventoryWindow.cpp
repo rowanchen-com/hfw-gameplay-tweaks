@@ -80,15 +80,14 @@ namespace HRZ2::DebugUI
 			return;
 		}
 
-		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "WARNING:");
+		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "警告：");
 		ImGui::SameLine();
-		ImGui::TextWrapped("Spawning, adding, or deleting quest items can permanently break game progression. Create a new save before "
-						   "using this tool. Use at your own risk.");
+		ImGui::TextWrapped("生成、添加或删除任务物品可能永久破坏游戏进度。使用此工具前请新建存档，风险自负。");
 
-		m_NameFilter.Draw();
-		ImGui::Checkbox("Show only player inventory items", &m_FilterItemsInPlayerInventory);
+		m_NameFilter.Draw("筛选（包含,-排除）###InventoryFilter");
+		ImGui::Checkbox("仅显示玩家物品栏中的物品###ShowOnlyPlayerInventoryItems", &m_FilterItemsInPlayerInventory);
 		ImGui::SameLine();
-		ImGui::Checkbox("Show localized names", &m_ShowLocalizedItemNames);
+		ImGui::Checkbox("显示游戏本地化名称###ShowLocalizedNames", &m_ShowLocalizedItemNames);
 
 		const ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
 										   ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
@@ -96,9 +95,9 @@ namespace HRZ2::DebugUI
 
 		if (ImGui::BeginTable("inventory_item_list", 3, tableFlags))
 		{
-			ImGui::TableSetupColumn("Name");
-			ImGui::TableSetupColumn("Count");
-			ImGui::TableSetupColumn("Resource UUID");
+			ImGui::TableSetupColumn("名称###Name");
+			ImGui::TableSetupColumn("数量###Count");
+			ImGui::TableSetupColumn("资源 UUID###ResourceUUID");
 			ImGui::TableSetupScrollFreeze(1, 1);
 			ImGui::TableHeadersRow();
 
@@ -223,32 +222,32 @@ namespace HRZ2::DebugUI
 
 		int64_t itemCount = 0;
 
-		if (ImGui::Selectable("Add One", false, 0, ImVec2(200, 0)))
+		if (ImGui::Selectable("增加 1 个###AddOne", false, 0, ImVec2(200, 0)))
 			itemCount += 1;
 
-		if (ImGui::Selectable("Add Five"))
+		if (ImGui::Selectable("增加 5 个###AddFive"))
 			itemCount += 5;
 
 		// Only able to remove existing items
 		if (Item)
 		{
-			if (ImGui::Selectable("Add Double"))
+			if (ImGui::Selectable("增加当前数量的两倍###AddDouble"))
 				itemCount += static_cast<int64_t>(Item->m_Amount) * 2;
 
 			ImGui::Selectable("##sepsel1", false, ImGuiSelectableFlags_Disabled);
 
-			if (ImGui::Selectable("Remove One"))
+			if (ImGui::Selectable("移除 1 个###RemoveOne"))
 				itemCount -= 1;
 
-			if (ImGui::Selectable("Remove Five"))
+			if (ImGui::Selectable("移除 5 个###RemoveFive"))
 				itemCount -= 5;
 
-			if (ImGui::Selectable("Remove Half"))
+			if (ImGui::Selectable("移除一半###RemoveHalf"))
 				itemCount -= std::max(Item->m_Amount / 2, 1u);
 
 			ImGui::Selectable("##sepsel2", false, ImGuiSelectableFlags_Disabled);
 
-			if (ImGui::Selectable("Remove All"))
+			if (ImGui::Selectable("全部移除###RemoveAll"))
 				itemCount -= Item->m_Amount;
 		}
 
@@ -312,6 +311,6 @@ namespace HRZ2::DebugUI
 
 	std::string PlayerInventoryWindow::GetId() const
 	{
-		return "Player Inventory";
+		return "玩家物品栏###PlayerInventoryWindow";
 	}
 }

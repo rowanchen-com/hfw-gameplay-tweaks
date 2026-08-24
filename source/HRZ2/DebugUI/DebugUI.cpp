@@ -37,6 +37,45 @@ namespace HRZ2::DebugUI
 
 	LRESULT WINAPI WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
 
+	static ImFont *LoadChineseFont(ImGuiIO& IO)
+	{
+		std::vector<std::filesystem::path> fontCandidates;
+
+		if (!ModConfiguration.DebugMenuFontPath.empty())
+		{
+			std::filesystem::path configuredPath(ModConfiguration.DebugMenuFontPath);
+			fontCandidates.emplace_back(
+				configuredPath.is_absolute() ? configuredPath : InternalModConfig::GetModRelativePath(ModConfiguration.DebugMenuFontPath));
+		}
+
+		fontCandidates.emplace_back("C:/Windows/Fonts/msyh.ttc");
+		fontCandidates.emplace_back("C:/Windows/Fonts/simhei.ttf");
+		fontCandidates.emplace_back("C:/Windows/Fonts/simsun.ttc");
+
+		for (const auto& fontPath : fontCandidates)
+		{
+			std::error_code error;
+
+			if (!std::filesystem::is_regular_file(fontPath, error))
+				continue;
+
+			ImFontConfig fontConfig {};
+			fontConfig.FontNo = 0;
+
+			const auto fontPathString = fontPath.string();
+			if (auto font = IO.Fonts->AddFontFromFileTTF(
+					fontPathString.c_str(),
+					ModConfiguration.DebugMenuFontSize,
+					&fontConfig,
+					IO.Fonts->GetGlyphRangesChineseFull()))
+			{
+				return font;
+			}
+		}
+
+		return IO.Fonts->AddFontDefault();
+	}
+
 	void Initialize(NxDXGIImpl *DXGIImpl)
 	{
 		// Steal the device and window handle from the swap chain
@@ -92,6 +131,7 @@ namespace HRZ2::DebugUI
 		style.ScrollbarRounding = 0;
 
 		auto& io = ImGui::GetIO();
+		io.FontDefault = LoadChineseFont(io);
 		io.FontGlobalScale = ModConfiguration.DebugMenuFontScale;
 		io.MouseDrawCursor = false;
 

@@ -1,14 +1,25 @@
 # Horizon Forbidden West Gameplay Tweaks & Cheat Menu
 
-Source code for the Horizon Forbidden West mod.
+Source code for the Horizon Forbidden West mod, with a complete Simplified Chinese interface and localized configuration resources.
+
+## Simplified Chinese localization
+
+- Translates the gameplay, cheats, miscellaneous, entity spawner, inventory, weather, and log interfaces.
+- Loads a CJK-capable font so Chinese text renders correctly in Dear ImGui.
+- Includes localized `mod_config.ini` and `mod_DamageSettings.ini` resources without changing the original cheat defaults.
+- Uses `C:/Windows/Fonts/msyh.ttc` by default. `DebugMenuFontPath` and `DebugMenuFontSize` can be changed under `[General]`.
 
 ## Installation
 
 - For developers, edit `CMakeUserEnvVars.json` and set `GAME_ROOT_DIRECTORY` to Horizon's root directory. The build script will automatically copy library files to the game folder.
 
-- For manual Steam installs, copy `winhttp.dll` and `mod_config.ini` folder to the game's root folder. An example path is: `C:\Program Files (x86)\Steam\steamapps\common\Horizon Forbidden West Complete Edition\`.
+- For manual Steam installs, copy `winhttp.dll`, `mod_config.ini`, and `mod_DamageSettings.ini` to the game's root folder. An example path is: `C:\Program Files (x86)\Steam\steamapps\common\Horizon Forbidden West Complete Edition\`.
 
 ## Building
+
+### GitHub Actions
+
+Open the repository's **Actions** tab, select **Build Windows DLL**, and choose **Run workflow**. The workflow only supports manual dispatch and uploads the Release x64 DLL and packaged ZIP as the `HFW-Gameplay-Tweaks-zh-CN` artifact.
 
 ### Requirements
 

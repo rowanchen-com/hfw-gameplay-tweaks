@@ -30,6 +30,7 @@ add_subdirectory("${PROJECT_SOURCE_PATH}")
 install(
     FILES
         "${PROJECT_RESOURCES_PATH}/mod_config.ini"
+        "${PROJECT_RESOURCES_PATH}/mod_DamageSettings.ini"
     DESTINATION
         "/"
 )
