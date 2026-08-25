@@ -18,6 +18,7 @@ namespace
 		case Mode::DamageMultiplier: return Feature::DamageMultiplier;
 		case Mode::DefenseMultiplier: return Feature::DefenseMultiplier;
 		case Mode::ExperienceMultiplier: return Feature::ExperienceMultiplier;
+		case Mode::InfiniteJump: return Feature::InfiniteJump;
 		case Mode::ToolsAmount: return Feature::EditTools;
 		case Mode::AmmoAmount: return Feature::EditAmmo;
 		case Mode::ResourcesAmount: return Feature::EditResources;
@@ -46,6 +47,7 @@ namespace HRZ2::DebugUI
 		case Mode::DamageMultiplier: m_FloatValue = TrainerCheats::GetDamageMultiplier(); break;
 		case Mode::DefenseMultiplier: m_FloatValue = TrainerCheats::GetDefenseMultiplier(); break;
 		case Mode::ExperienceMultiplier: m_FloatValue = TrainerCheats::GetExperienceMultiplier(); break;
+		case Mode::InfiniteJump: m_FloatValue = TrainerCheats::GetInfiniteJumpVelocity(); break;
 		case Mode::ToolsAmount:
 		case Mode::AmmoAmount:
 		case Mode::ResourcesAmount:
@@ -64,6 +66,7 @@ namespace HRZ2::DebugUI
 		case Mode::DamageMultiplier: return "伤害倍率设置";
 		case Mode::DefenseMultiplier: return "防御倍率设置";
 		case Mode::ExperienceMultiplier: return "经验倍率设置";
+		case Mode::InfiniteJump: return "无限跳高度设置";
 		case Mode::ToolsAmount: return "修改工具数量";
 		case Mode::AmmoAmount: return "修改弹药数量";
 		case Mode::ResourcesAmount: return "修改资源数量";
@@ -74,6 +77,8 @@ namespace HRZ2::DebugUI
 
 	const char *TrainerValueEditorWindow::GetExplanation() const
 	{
+		if (m_Mode == Mode::InfiniteJump)
+			return "输入每次重新按下空格时施加的向上力度。默认 12，数值越大跳得越高；这不是米数。起跳后立即恢复游戏原版重力和下降速度。";
 		if (IsMultiplier())
 			return "输入倍率并确认后才会启用。关闭倍率会恢复游戏的正常计算。";
 		if (m_Mode == Mode::SkillPoints)
@@ -87,12 +92,26 @@ namespace HRZ2::DebugUI
 			m_Mode == Mode::ExperienceMultiplier;
 	}
 
+	bool TrainerValueEditorWindow::UsesFloatValue() const
+	{
+		return IsMultiplier() || m_Mode == Mode::InfiniteJump;
+	}
+
 	void TrainerValueEditorWindow::Confirm()
 	{
 		const auto feature = GetFeature(m_Mode);
 		if (!TrainerCheats::IsAvailable(feature))
 		{
 			m_Status = "当前游戏版本无法使用此修改项。";
+			return;
+		}
+
+		if (m_Mode == Mode::InfiniteJump)
+		{
+			m_FloatValue = std::clamp(m_FloatValue, 1.0f, 50.0f);
+			TrainerCheats::SetInfiniteJumpVelocity(m_FloatValue);
+			TrainerCheats::SetEnabled(feature, true);
+			m_Status = std::format("无限跳已启用：向上力度 {:.2f}。松开并重新按下空格即可再次起跳。", m_FloatValue);
 			return;
 		}
 
@@ -129,7 +148,10 @@ namespace HRZ2::DebugUI
 	{
 		const auto feature = GetFeature(m_Mode);
 		TrainerCheats::SetEnabled(feature, false);
-		m_Status = IsMultiplier() ? "倍率已关闭，恢复游戏默认计算。" : "待处理的数量修改已取消。";
+		if (m_Mode == Mode::InfiniteJump)
+			m_Status = "无限跳已关闭。";
+		else
+			m_Status = IsMultiplier() ? "倍率已关闭，恢复游戏默认计算。" : "待处理的数量修改已取消。";
 	}
 
 	void TrainerValueEditorWindow::Render()
@@ -186,14 +208,15 @@ namespace HRZ2::DebugUI
 			ImGui::BeginGroup();
 			ImGui::TextWrapped("%s", GetExplanation());
 			ImGui::Spacing();
-			ImGui::TextUnformatted(IsMultiplier() ? "输入倍率" : "输入数量");
+			ImGui::TextUnformatted(m_Mode == Mode::InfiniteJump ? "向上力度（1 - 50）" :
+				(IsMultiplier() ? "输入倍率" : "输入数量"));
 			ImGui::SetNextItemWidth(width - 40.0f * scale);
 			if (m_RequestKeyboardFocus)
 			{
 				ImGui::SetKeyboardFocusHere();
 				m_RequestKeyboardFocus = false;
 			}
-			if (IsMultiplier())
+			if (UsesFloatValue())
 				ImGui::InputFloat("##TrainerFloatValue", &m_FloatValue, 0.0f, 0.0f, "%.2f");
 			else
 				ImGui::InputScalar("##TrainerIntegerValue", ImGuiDataType_U32, &m_IntegerValue, nullptr, nullptr, "%u");
@@ -204,7 +227,9 @@ namespace HRZ2::DebugUI
 			if (ImGui::Button("确认修改", ImVec2(buttonWidth, 50.0f * scale)))
 				Confirm();
 			ImGui::SameLine(0.0f, buttonGap);
-			if (ImGui::Button(IsMultiplier() ? "关闭倍率" : "取消待处理", ImVec2(buttonWidth, 50.0f * scale)))
+			const char *secondaryAction = m_Mode == Mode::InfiniteJump ? "关闭无限跳" :
+				(IsMultiplier() ? "关闭倍率" : "取消待处理");
+			if (ImGui::Button(secondaryAction, ImVec2(buttonWidth, 50.0f * scale)))
 				DisableOrCancel();
 
 			if (!m_Status.empty())

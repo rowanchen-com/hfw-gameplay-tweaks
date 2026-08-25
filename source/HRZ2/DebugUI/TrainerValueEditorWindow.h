@@ -14,6 +14,7 @@ namespace HRZ2::DebugUI
 			DamageMultiplier,
 			DefenseMultiplier,
 			ExperienceMultiplier,
+			InfiniteJump,
 			ToolsAmount,
 			AmmoAmount,
 			ResourcesAmount,
@@ -41,6 +42,7 @@ namespace HRZ2::DebugUI
 		const char *GetTitle() const;
 		const char *GetExplanation() const;
 		bool IsMultiplier() const;
+		bool UsesFloatValue() const;
 		void Confirm();
 		void DisableOrCancel();
 	};
