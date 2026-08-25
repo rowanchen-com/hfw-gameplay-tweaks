@@ -528,10 +528,10 @@ namespace
 			code.cmp(qword[r11], rcx);
 			code.pop(r11);
 			code.jne(originalTest);
-			code.test_(rcx, rcx);
+			code.test(rcx, rcx);
 			code.jmp(complete);
 			code.L(originalTest);
-			code.test_(eax, 0xA0000000);
+			code.test(eax, 0xA0000000);
 			code.L(complete);
 		});
 		SetAvailability(Feature::IgnoreHits, ignoreHitsAvailable);
@@ -640,7 +640,7 @@ namespace
 			code.mov(dword[r11], 0);
 			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_skillPoints));
 			code.mov(edi, dword[r11]);
-			code.test_(edi, edi);
+			code.test(edi, edi);
 			code.jle(original);
 			code.mov(dword[rcx + skillPointOffset], edi);
 			code.L(original);
@@ -788,7 +788,7 @@ namespace
 			code.mov(rax, reinterpret_cast<std::uintptr_t>(&g_resourcesAmount));
 			code.L(writeValue);
 			code.mov(edx, dword[rax]);
-			code.test_(edx, edx);
+			code.test(edx, edx);
 			code.jle(restore);
 			code.mov(dword[rcx + 0x50], edx);
 
