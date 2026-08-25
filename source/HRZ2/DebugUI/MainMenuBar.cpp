@@ -569,8 +569,15 @@ namespace HRZ2::DebugUI
 			draw->AddText(font, fontSize, ImVec2(breadcrumbMin.x + 20.0f * scale, breadcrumbMin.y + (breadcrumbHeight - fontSize) * 0.5f),
 				IM_COL32(218, 250, 252, 255), GetPageTitle());
 
-			if (ImGui::IsWindowHovered() && io.MouseWheel != 0.0f)
+			const bool wheelNavigated = ImGui::IsWindowHovered() && io.MouseWheel != 0.0f;
+			if (wheelNavigated)
 			{
+				// Keep small physical mouse movements from immediately overriding the row
+				// selected by the wheel on this or a following frame.
+				m_SuppressPointerSelection = true;
+				m_PointerSuppressionAnchorX = io.MousePos.x;
+				m_PointerSuppressionAnchorY = io.MousePos.y;
+
 				if (io.MouseWheel > 0.0f)
 				{
 					if (state.SelectedIndex > 0)
@@ -589,7 +596,17 @@ namespace HRZ2::DebugUI
 
 			const bool pointerMoved = io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f;
 			const bool pointerClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
-			const bool allowPointerSelection = io.MouseWheel == 0.0f && (pointerMoved || pointerClicked);
+			if (m_SuppressPointerSelection && !wheelNavigated)
+			{
+				const float deltaX = io.MousePos.x - m_PointerSuppressionAnchorX;
+				const float deltaY = io.MousePos.y - m_PointerSuppressionAnchorY;
+				const float intentionalMoveThreshold = 14.0f * scale;
+				if (pointerClicked || deltaX * deltaX + deltaY * deltaY >= intentionalMoveThreshold * intentionalMoveThreshold)
+					m_SuppressPointerSelection = false;
+			}
+
+			const bool allowPointerSelection = !wheelNavigated &&
+				(pointerClicked || (!m_SuppressPointerSelection && pointerMoved));
 			for (size_t visibleIndex = 0; visibleIndex < visibleRows; visibleIndex++)
 			{
 				const size_t itemIndex = state.ScrollOffset + visibleIndex;

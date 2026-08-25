@@ -86,6 +86,9 @@ namespace HRZ2::DebugUI
 		};
 
 		std::vector<NavigationState> m_Navigation { NavigationState {} };
+		bool m_SuppressPointerSelection = false;
+		float m_PointerSuppressionAnchorX = 0.0f;
+		float m_PointerSuppressionAnchorY = 0.0f;
 		static inline std::optional<WorldPosition> m_SavedPosition;
 		static inline std::optional<WorldPosition> m_UndoPosition;
 
