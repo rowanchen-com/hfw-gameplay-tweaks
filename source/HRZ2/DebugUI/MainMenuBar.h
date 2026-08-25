@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 #include "../Core/WorldTransform.h"
@@ -58,6 +59,9 @@ namespace HRZ2::DebugUI
 		{
 			Home,
 			Player,
+			Combat,
+			Survival,
+			Resources,
 			World,
 			Teleport,
 			Faction,
@@ -86,6 +90,8 @@ namespace HRZ2::DebugUI
 		};
 
 		std::vector<NavigationState> m_Navigation { NavigationState {} };
+		static inline std::optional<WorldPosition> m_SavedPosition;
+		static inline std::optional<WorldPosition> m_UndoPosition;
 
 		std::vector<MenuItem> BuildMenuItems();
 		void DrawTrainerFrame(std::vector<MenuItem>& Items);

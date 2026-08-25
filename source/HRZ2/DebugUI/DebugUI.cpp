@@ -20,6 +20,7 @@
 #include "../Core/JobHeaderCPU.h"
 #include "../Nx/NxD3DImpl.h"
 #include "../Nx/NxDXGIImpl.h"
+#include "../TrainerCheats.h"
 #include "EntitySpawnerWindow.h"
 #include "DebugUI.h"
 #include "MainMenuBar.h"
@@ -653,6 +654,7 @@ namespace HRZ2::DebugUI
 	{
 		auto debugSettings = DebugSettings::GetInstance();
 		auto player = Player::GetLocalPlayer();
+		TrainerCheats::UpdatePlayerState(player);
 
 		if (!debugSettings || !player || !player->m_Entity)
 			return;

@@ -18,6 +18,14 @@ Source code for the Horizon Forbidden West mod, with a complete Simplified Chine
 - Press `Enter` to activate an option, `Backspace` or `Escape` to return, or use the mouse.
 - The internal player-faction identifiers intentionally remain in English because they are game resource names rather than display text.
 
+## Integrated trainer features
+
+- Combat: ignore hit checks, infinite health, infinite focus/valor/skill duration/oxygen, maximum medicine, infinite arrows and traps, instant bow charge, super damage, damage multiplier, and defense multiplier.
+- Resources and progression: runtime crafting/purchase bypass, configurable tool/ammo/resource stack values, experience multiplier, experience grant, and skill-point editing.
+- World and movement: stealth mode, trial-timer freeze, the existing engine timescale control, save location, teleport, undo teleport, and teleport to the active map waypoint.
+- Existing engine-backed god mode, ammo, free camera, noclip, inventory editor, entity spawner, weather, and world tools remain available. All newly integrated trainer toggles default to off.
+- Trainer signatures are optional and version-aware: a missing signature disables only its matching menu item instead of preventing the DLL from loading.
+
 ## Installation
 
 - For developers, edit `CMakeUserEnvVars.json` and set `GAME_ROOT_DIRECTORY` to Horizon's root directory. The build script will automatically copy library files to the game folder.
@@ -55,6 +63,11 @@ Open the repository's **Actions** tab, select **Build Windows DLL**, and choose 
 <details>
   <summary>Click to expand.</summary><br/>
   
+**Version 0.18**
+  - Integrated the current 26-function trainer behavior into categorized Chinese menu pages, while reusing existing engine-backed implementations where appropriate.
+  - Added independent optional AOB scanning so unsupported individual trainer functions fail closed without breaking the base mod.
+  - Added saved-position, undo-teleport, and active-map-waypoint actions to the teleport page.
+
 **Version 0.17**
   - Added a cheat to automatically set the player's faction to neutral.
   - Added a hotkey to pause the current time of day.

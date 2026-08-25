@@ -1,6 +1,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <toml++/toml.h>
 #include "HRZ2/DebugUI/LogWindow.h"
+#include "HRZ2/TrainerCheats.h"
 #include "ModConfiguration.h"
 
 namespace InternalModConfig
@@ -59,6 +60,9 @@ namespace InternalModConfig
 
 		if (!Hooks::Initialize())
 			throw std::runtime_error("Failed to initialize hooks.");
+
+		// Optional trainer integrations are scanned independently. A missing signature disables only that feature.
+		HRZ2::TrainerCheats::Initialize();
 	}
 
 	bool InitializeConfigurationFile()

@@ -19,6 +19,7 @@
 #include "../Core/RTTIRefObject.h"
 #include "../Core/RTTIYamlExporter.h"
 #include "../RTTIScanner.h"
+#include "../TrainerCheats.h"
 #include "DebugUI.h"
 #include "DemoWindow.h"
 #include "EntitySpawnerWindow.h"
@@ -157,6 +158,26 @@ namespace HRZ2::DebugUI
 			});
 		};
 
+		auto featureDescription = [](TrainerCheats::Feature FeatureValue, std::string Description)
+		{
+			if (!TrainerCheats::IsAvailable(FeatureValue))
+			{
+				Description += "（不可用：";
+				Description += TrainerCheats::GetUnavailableReason(FeatureValue);
+				Description += "）";
+			}
+			return Description;
+		};
+
+		auto addFeatureToggle = [&](std::string Label, std::string Description, TrainerCheats::Feature FeatureValue)
+		{
+			addToggle(std::move(Label), featureDescription(FeatureValue, std::move(Description)),
+				TrainerCheats::IsEnabled(FeatureValue), [FeatureValue](bool Enabled)
+				{
+					TrainerCheats::SetEnabled(FeatureValue, Enabled);
+				}, TrainerCheats::IsAvailable(FeatureValue));
+		};
+
 		const auto currentPage = m_Navigation.back().PageId;
 		auto player = Player::GetLocalPlayer();
 		const bool playerAvailable = player && player->m_Entity;
@@ -164,7 +185,10 @@ namespace HRZ2::DebugUI
 		switch (currentPage)
 		{
 		case Page::Home:
-			addSubmenu("玩家选项", "无敌、弹药、自由镜头、穿墙和玩家状态。", Page::Player, playerAvailable);
+			addSubmenu("玩家选项", "自由镜头、穿墙、原有引擎无敌、弹药和玩家状态。", Page::Player, playerAvailable);
+			addSubmenu("战斗强化", "无视命中、生命、伤害、弹药与弓箭相关功能。", Page::Combat, playerAvailable);
+			addSubmenu("生存与技能", "专注、勇气、氧气、技能持续时间及潜行功能。", Page::Survival, playerAvailable);
+			addSubmenu("资源与成长", "物品数量、制作、经验与技能点功能。", Page::Resources, playerAvailable);
 			addSubmenu("世界与时间", "控制游戏暂停、昼夜时间、时间倍率和显示距离。", Page::World);
 			addSubmenu("传送", "将玩家传送到预设坐标或自由镜头位置。", Page::Teleport, playerAvailable);
 			addSubmenu("玩家阵营", "切换玩家使用的游戏内部 AI 阵营。", Page::Faction, playerAvailable);
@@ -245,6 +269,81 @@ namespace HRZ2::DebugUI
 			break;
 		}
 
+		case Page::Combat:
+		{
+			addFeatureToggle("无视命中判定", "让针对玩家的伤害命中判定直接失效；与原有引擎无敌是两套独立实现。",
+				TrainerCheats::Feature::IgnoreHits);
+			addFeatureToggle("无限生命", "持续将玩家生命值保持为 9999。", TrainerCheats::Feature::InfiniteHealth);
+			addFeatureToggle("超级伤害 / 一击必杀", "把对敌人的有效伤害提高到极高数值；部分特殊目标可能仍有剧情保护。",
+				TrainerCheats::Feature::SuperDamage);
+			addFeatureToggle("伤害倍率", "对敌人造成伤害时应用下面设置的倍率。", TrainerCheats::Feature::DamageMultiplier);
+			addValue("伤害倍率数值", std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()),
+				"左右键以 0.5 为步长调整，范围 1 到 100。",
+				[]() { TrainerCheats::SetDamageMultiplier(TrainerCheats::GetDamageMultiplier() - 0.5f); },
+				[]() { TrainerCheats::SetDamageMultiplier(TrainerCheats::GetDamageMultiplier() + 0.5f); },
+				TrainerCheats::IsAvailable(TrainerCheats::Feature::DamageMultiplier));
+			addFeatureToggle("防御倍率", "受到有效伤害时按下面的倍率降低伤害。", TrainerCheats::Feature::DefenseMultiplier);
+			addValue("防御倍率数值", std::format("{:.1f}x", TrainerCheats::GetDefenseMultiplier()),
+				"左右键以 0.5 为步长调整，范围 1 到 100。",
+				[]() { TrainerCheats::SetDefenseMultiplier(TrainerCheats::GetDefenseMultiplier() - 0.5f); },
+				[]() { TrainerCheats::SetDefenseMultiplier(TrainerCheats::GetDefenseMultiplier() + 0.5f); },
+				TrainerCheats::IsAvailable(TrainerCheats::Feature::DefenseMultiplier));
+			addFeatureToggle("无限箭矢与陷阱", "使用箭矢或陷阱时把当前计数保持为 99。",
+				TrainerCheats::Feature::InfiniteArrowsAndTraps);
+			addFeatureToggle("弓箭瞬间蓄力", "拉弓时立即达到完整蓄力。", TrainerCheats::Feature::InstantBowCharge);
+			break;
+		}
+
+		case Page::Survival:
+			addFeatureToggle("无限专注", "持续恢复武器轮盘与瞄准使用的专注值。", TrainerCheats::Feature::InfiniteFocus);
+			addFeatureToggle("无限勇气", "持续补充勇气激增所需的勇气值。", TrainerCheats::Feature::InfiniteValor);
+			addFeatureToggle("无限技能持续时间", "冻结受支持技能的剩余持续时间。", TrainerCheats::Feature::InfiniteSkillDuration);
+			addFeatureToggle("无限氧气", "水下活动时不再消耗氧气。", TrainerCheats::Feature::InfiniteOxygen);
+			addFeatureToggle("药用浆果袋保持满额", "消耗药用浆果后立即恢复到当前容量。", TrainerCheats::Feature::MaxMedicinePouch);
+			addFeatureToggle("隐身模式", "同时关闭相关 AI 发现分支并持续清除警觉状态。", TrainerCheats::Feature::StealthMode);
+			addFeatureToggle("锁定试炼时间", "冻结狩猎场等受支持试炼的计时器。", TrainerCheats::Feature::FreezeTrialTimer);
+			break;
+
+		case Page::Resources:
+		{
+			const auto addItemEditor = [&](const char *Name, TrainerCheats::Feature FeatureValue)
+			{
+				addFeatureToggle(std::string("锁定") + Name + "数量", std::string("处理玩家") + Name + "堆叠时写入指定数量。", FeatureValue);
+				addValue(std::string(Name) + "数量", std::to_string(TrainerCheats::GetItemAmount(FeatureValue)),
+					"左右键以 100 为步长调整，范围 1 到 9999。",
+					[FeatureValue]()
+					{
+						const auto value = TrainerCheats::GetItemAmount(FeatureValue);
+						TrainerCheats::SetItemAmount(FeatureValue, value > 100 ? value - 100 : 1);
+					},
+					[FeatureValue]() { TrainerCheats::SetItemAmount(FeatureValue, TrainerCheats::GetItemAmount(FeatureValue) + 100); },
+					TrainerCheats::IsAvailable(FeatureValue));
+			};
+
+			addItemEditor("工具", TrainerCheats::Feature::EditTools);
+			addItemEditor("弹药", TrainerCheats::Feature::EditAmmo);
+			addItemEditor("资源", TrainerCheats::Feature::EditResources);
+			addFeatureToggle("无视制作与购买需求", "运行时跳过材料和购买条件检查。",
+				TrainerCheats::Feature::IgnoreCraftingRequirements);
+			addFeatureToggle("经验倍率", "获得经验时应用下面设置的倍率。", TrainerCheats::Feature::ExperienceMultiplier);
+			addValue("经验倍率数值", std::format("{:.1f}x", TrainerCheats::GetExperienceMultiplier()),
+				"左右键以 0.5 为步长调整，范围 1 到 100。",
+				[]() { TrainerCheats::SetExperienceMultiplier(TrainerCheats::GetExperienceMultiplier() - 0.5f); },
+				[]() { TrainerCheats::SetExperienceMultiplier(TrainerCheats::GetExperienceMultiplier() + 0.5f); },
+				TrainerCheats::IsAvailable(TrainerCheats::Feature::ExperienceMultiplier));
+			addAction("获得大量经验", featureDescription(TrainerCheats::Feature::GrantExperience,
+				"排队一次 999999 经验修改，并在下一次经验结算时生效。"), []() { TrainerCheats::GrantExperience(); },
+				TrainerCheats::IsAvailable(TrainerCheats::Feature::GrantExperience));
+			addValue("技能点目标值", std::to_string(TrainerCheats::GetSkillPoints()), "左右键调整要写入的技能点数量。",
+				[]() { TrainerCheats::SetSkillPoints(TrainerCheats::GetSkillPoints() - 1); },
+				[]() { TrainerCheats::SetSkillPoints(TrainerCheats::GetSkillPoints() + 1); },
+				TrainerCheats::IsAvailable(TrainerCheats::Feature::EditSkillPoints));
+			addAction("应用技能点", featureDescription(TrainerCheats::Feature::EditSkillPoints,
+				"排队写入上面的技能点目标值，并在技能数据下次更新时生效。"), []() { TrainerCheats::ApplySkillPoints(); },
+				TrainerCheats::IsAvailable(TrainerCheats::Feature::EditSkillPoints));
+			break;
+		}
+
 		case Page::World:
 		{
 			addToggle("暂停游戏逻辑", "暂停大部分游戏世界更新。", m_PauseGame, [](bool Enabled) { m_PauseGame = Enabled; });
@@ -301,6 +400,27 @@ namespace HRZ2::DebugUI
 		}
 
 		case Page::Teleport:
+			addAction("保存当前位置", "记录玩家当前世界坐标；仅保存在本次游戏进程中。", []()
+			{
+				if (auto p = Player::GetLocalPlayer(); p && p->m_Entity)
+					m_SavedPosition = p->m_Entity->GetWorldTransform().Position;
+			}, playerAvailable);
+			addAction("传送到保存位置", m_SavedPosition
+				? std::format("坐标：{:.1f}, {:.1f}, {:.1f}", m_SavedPosition->X, m_SavedPosition->Y, m_SavedPosition->Z)
+				: "尚未保存位置。", []() { if (m_SavedPosition) TeleportTo(*m_SavedPosition); }, playerAvailable && m_SavedPosition.has_value());
+			addAction("撤销上次传送", m_UndoPosition
+				? std::format("返回：{:.1f}, {:.1f}, {:.1f}", m_UndoPosition->X, m_UndoPosition->Y, m_UndoPosition->Z)
+				: "本次游戏进程中尚未执行传送。", []() { if (m_UndoPosition) TeleportTo(*m_UndoPosition); },
+				playerAvailable && m_UndoPosition.has_value());
+			{
+				const auto waypoint = TrainerCheats::GetWaypointPosition();
+				addAction("传送到地图标记点", waypoint
+					? std::format("坐标：{:.1f}, {:.1f}, {:.1f}", waypoint->X, waypoint->Y, waypoint->Z)
+					: featureDescription(TrainerCheats::Feature::TeleportToWaypoint, "尚未读取到有效地图标记点。"), []()
+				{
+					if (const auto target = TrainerCheats::GetWaypointPosition()) TeleportTo(*target);
+				}, playerAvailable && waypoint.has_value());
+			}
 			addAction("自由镜头位置", std::format("坐标：{:.1f}, {:.1f}, {:.1f}", m_FreeCamPosition.Position.X,
 				m_FreeCamPosition.Position.Y, m_FreeCamPosition.Position.Z), []() { TeleportTo(m_FreeCamPosition.Position); }, playerAvailable);
 			for (const auto& location : TeleportLocations)
@@ -364,7 +484,7 @@ namespace HRZ2::DebugUI
 				exporter.ExportRTTITypes(".");
 			}, !RTTIScanner::GetAllTypes().empty());
 			addAction("导出玩家组件", "将玩家实体及组件信息写入日志。", []() { DumpPlayerComponents(); }, playerAvailable);
-			items.emplace_back(MenuItem { .Label = "项目版本", .Value = "0.17 中文版", .Description = "HFW Gameplay Tweaks；原作者 Nukem。", .Enabled = false });
+			items.emplace_back(MenuItem { .Label = "项目版本", .Value = "0.18 中文版", .Description = "HFW Gameplay Tweaks；原作者 Nukem。", .Enabled = false });
 			break;
 
 		case Page::ConfirmExit:
@@ -618,6 +738,9 @@ namespace HRZ2::DebugUI
 		{
 		case Page::Home: return "主菜单";
 		case Page::Player: return "玩家选项";
+		case Page::Combat: return "战斗强化";
+		case Page::Survival: return "生存与技能";
+		case Page::Resources: return "资源与成长";
 		case Page::World: return "世界与时间";
 		case Page::Teleport: return "传送";
 		case Page::Faction: return "玩家阵营";
@@ -636,9 +759,13 @@ namespace HRZ2::DebugUI
 
 		if (m_FreeCamMode == FreeCamMode::Noclip)
 		{
+			m_UndoPosition = m_FreeCamPosition.Position;
 			m_FreeCamPosition.Position = position;
 			return;
 		}
+
+		if (auto player = Player::GetLocalPlayer(); player && player->m_Entity)
+			m_UndoPosition = player->m_Entity->GetWorldTransform().Position;
 
 		JobHeaderCPU::SubmitCallable([position]()
 		{
