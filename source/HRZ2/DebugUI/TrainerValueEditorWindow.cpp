@@ -84,7 +84,7 @@ namespace HRZ2::DebugUI
 	const char *TrainerValueEditorWindow::GetExplanation() const
 	{
 		if (m_Mode == Mode::InfiniteJump)
-			return "输入跳跃高度倍率。1 为原版，默认 10；数值越大跳得越高。这里只修改 CT 中的高度分量，不启用慢速下降。";
+			return "输入跳跃高度倍率。1 为原版，默认 5；数值越大跳得越高。这里只修改 CT 中的高度分量，不启用慢速下降。";
 		if (m_Mode == Mode::MovementSpeed)
 			return "输入水平移动速度倍率。1 为原版，默认 3；只调整移动向量的水平分量，不改变跳跃高度或下降速度。";
 		if (m_Mode == Mode::FallSpeed)

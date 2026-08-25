@@ -36,7 +36,7 @@ namespace
 	std::atomic<float> g_damageMultiplier = 2.0f;
 	std::atomic<float> g_defenseMultiplier = 2.0f;
 	std::atomic<float> g_experienceMultiplier = 2.0f;
-	std::atomic<float> g_infiniteJumpHeightMultiplier = 10.0f;
+	std::atomic<float> g_infiniteJumpHeightMultiplier = 5.0f;
 	std::atomic<float> g_movementSpeedMultiplier = 3.0f;
 	std::atomic<float> g_fallSpeedMultiplier = 0.5f;
 	std::atomic_uint32_t g_infiniteJumpBypassUpdates = 0;
@@ -630,24 +630,14 @@ namespace
 		const auto fallSpeed = FindPattern("C5 FA 11 9B 80 01 00 00");
 		const bool fallSpeedAvailable = InstallMidHook("FallSpeed", fallSpeed, 8, [](Xbyak::CodeGenerator& code)
 		{
-			Xbyak::Label original, complete;
+			Xbyak::Label original;
 			EmitFlagCheck(code, Feature::FallSpeed, original);
-			code.pushfq();
 			code.push(r11);
-			code.sub(rsp, 0x10);
-			code.movdqu(ptr[rsp], xmm15);
-			code.movss(xmm15, xmm3);
 			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_fallSpeedMultiplier));
-			code.mulss(xmm15, dword[r11]);
-			code.movss(dword[rbx + 0x180], xmm15);
-			code.movdqu(xmm15, ptr[rsp]);
-			code.add(rsp, 0x10);
+			code.mulss(xmm3, dword[r11]);
 			code.pop(r11);
-			code.popfq();
-			code.jmp(complete);
 			code.L(original);
 			EmitOriginal(code, { 0xC5, 0xFA, 0x11, 0x9B, 0x80, 0x01, 0x00, 0x00 });
-			code.L(complete);
 		});
 		SetAvailability(Feature::FallSpeed, fallSpeedAvailable);
 
