@@ -36,7 +36,7 @@ jobs:
           restore-keys: |
             vcpkg-${{ runner.os }}-
 
-      - name: Configure, build, and package
+      - name: Configure and build
         shell: pwsh
         run: |
           & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -SkipAutomaticLocation
@@ -44,8 +44,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build --preset final-universal-release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cpack --preset final-universal -C Release
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stage flat artifact
+        shell: pwsh
+        run: |
+          $artifactDir = Join-Path $PWD "artifact"
+          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+          Copy-Item "bin/final-universal/Release/winhttp.dll" $artifactDir
+          Copy-Item "resources/mod_config.ini" $artifactDir
+          Copy-Item "resources/mod_DamageSettings.ini" $artifactDir
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -54,5 +61,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           path: |
-            bin/final-universal/Release/winhttp.dll
-            bin/built-packages/*.zip
+            artifact/winhttp.dll
+            artifact/mod_config.ini
+            artifact/mod_DamageSettings.ini
