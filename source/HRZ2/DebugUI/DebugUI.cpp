@@ -382,17 +382,22 @@ namespace HRZ2::DebugUI
 		if (!InterceptInput)
 			ImGui::FocusWindow(nullptr);
 
-		// A copy is required because Render() might create new instances and invalidate iterators
-		auto currentWindows = m_Windows;
-
-		for (auto& entry : currentWindows)
+		// Treat the trainer and all of its tool windows as one overlay. Hiding the menu must not
+		// close child windows; skipping their rendering preserves which tools should reappear.
+		if (MainMenuBar::m_IsVisible)
 		{
-			auto& window = entry.second;
+			// A copy is required because Render() might create new instances and invalidate iterators
+			auto currentWindows = m_Windows;
 
-			// Keep window instances alive after they are closed. Streaming callbacks registered by
-			// inventory, weather, and entity windows retain their userdata pointer asynchronously.
-			if (!window->Close())
-				window->Render();
+			for (auto& entry : currentWindows)
+			{
+				auto& window = entry.second;
+
+				// Keep window instances alive after they are closed. Streaming callbacks registered by
+				// inventory, weather, and entity windows retain their userdata pointer asynchronously.
+				if (!window->Close())
+					window->Render();
+			}
 		}
 
 		ImGui::Render();
