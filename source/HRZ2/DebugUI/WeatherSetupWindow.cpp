@@ -6,6 +6,7 @@
 #include "../Core/JobHeaderCPU.h"
 #include "../Core/WeatherSystem.h"
 #include "WeatherSetupWindow.h"
+#include "TrainerToolWindow.h"
 
 namespace HRZ2::DebugUI
 {
@@ -53,13 +54,9 @@ namespace HRZ2::DebugUI
 
 	void WeatherSetupWindow::Render()
 	{
-		ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
-
-		if (!ImGui::Begin(GetId().c_str(), &m_WindowOpen))
-		{
-			ImGui::End();
+		TrainerToolWindow window(GetId().c_str(), "天气设置", &m_WindowOpen, ImVec2(700.0f, 700.0f));
+		if (!window)
 			return;
-		}
 
 		// Draw weather setup list
 		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###WeatherSetupFilter");
@@ -138,7 +135,6 @@ namespace HRZ2::DebugUI
 		ImGui::TextDisabled("注意：部分名称缺失，可以在模组配置文件中手动添加。");
 		ImGui::PopTextWrapPos();
 		ImGui::EndDisabled();
-		ImGui::End();
 
 		m_DoSetOnNextFrame = false;
 	}

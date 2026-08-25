@@ -131,6 +131,12 @@ namespace HRZ2::DebugUI
 			});
 		};
 
+		auto addToolWindow = [&](std::string Label, std::string Description, std::function<void()> Callback, bool Enabled = true)
+		{
+			addAction(std::move(Label), std::move(Description), std::move(Callback), Enabled);
+			items.back().Value = "打开";
+		};
+
 		auto addToggle = [&items](std::string Label, std::string Description, bool CurrentValue,
 			std::function<void(bool)> Setter, bool Enabled = true)
 		{
@@ -162,9 +168,9 @@ namespace HRZ2::DebugUI
 			addSubmenu("世界与时间", "控制游戏暂停、昼夜时间、时间倍率和显示距离。", Page::World);
 			addSubmenu("传送", "将玩家传送到预设坐标或自由镜头位置。", Page::Teleport, playerAvailable);
 			addSubmenu("玩家阵营", "切换玩家使用的游戏内部 AI 阵营。", Page::Faction, playerAvailable);
-			addAction("玩家物品栏", "打开物品管理窗口；操作任务物品前请先备份存档。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
-			addAction("实体生成器", "打开实体生成窗口，可生成机器、动物和其他实体。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
-			addAction("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
+			addToolWindow("玩家物品栏", "打开物品管理窗口；操作任务物品前请先备份存档。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
+			addToolWindow("实体生成器", "打开实体生成窗口，可生成机器、动物和其他实体。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
+			addToolWindow("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
 			addSubmenu("实用工具", "保存、读取和菜单控制。", Page::Utilities);
 			addSubmenu("开发者工具", "日志、RTTI 导出和调试功能。", Page::Developer);
 			break;
@@ -342,16 +348,16 @@ namespace HRZ2::DebugUI
 		case Page::Utilities:
 			addAction("强制快速保存", "立即请求一次快速保存。", []() { ToggleQuickSave(); }, playerAvailable);
 			addAction("读取上一存档", "立即读取最近一次存档。", []() { ToggleQuickLoad(); }, playerAvailable);
-			addAction("玩家物品栏", "打开物品管理窗口。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
-			addAction("实体生成器", "打开实体生成窗口。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
-			addAction("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
+			addToolWindow("玩家物品栏", "打开物品管理窗口。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
+			addToolWindow("实体生成器", "打开实体生成窗口。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
+			addToolWindow("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
 			addAction("关闭修改器菜单", "关闭菜单并恢复游戏输入。", []() { SetMenuVisible(false); });
 			addSubmenu("结束游戏", "显示确认页面后终止当前游戏进程。", Page::ConfirmExit);
 			break;
 
 		case Page::Developer:
-			addAction("显示日志窗口", "打开模组内部日志窗口。", []() { AddWindow(std::make_shared<LogWindow>()); });
-			addAction("显示 ImGui 演示窗口", "打开 Dear ImGui 官方英文演示窗口。", []() { AddWindow(std::make_shared<DemoWindow>()); });
+			addToolWindow("显示日志窗口", "打开模组内部日志窗口。", []() { AddWindow(std::make_shared<LogWindow>()); });
+			addToolWindow("显示 ImGui 演示窗口", "打开 Dear ImGui 官方英文演示窗口。", []() { AddWindow(std::make_shared<DemoWindow>()); });
 			addAction("导出 RTTI 结构", "将已扫描的 RTTI 类型导出到游戏目录。", []()
 			{
 				RTTIYamlExporter exporter(RTTIScanner::GetAllTypes());
@@ -562,7 +568,7 @@ namespace HRZ2::DebugUI
 			draw->AddText(font, fontSize * 0.88f, ImVec2(footerMax.x - counterWidth - 13.0f * scale, footerMin.y + 7.0f * scale),
 				IM_COL32(226, 169, 60, 255), pageCounter.c_str());
 			draw->AddText(font, fontSize * 0.88f, ImVec2(footerMin.x + 13.0f * scale, footerMin.y + 7.0f * scale),
-				IM_COL32(130, 157, 161, 255), "上下选择  左右调整  回车确认  退格返回");
+				IM_COL32(130, 157, 161, 255), "方向键  回车确认  退格返回  INS关闭");
 			const auto& description = Items[state.SelectedIndex].Description;
 			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMin.x + 13.0f * scale, footerMin.y + 34.0f * scale),
 				IM_COL32(208, 220, 221, 255), description.c_str(), nullptr, width - 26.0f * scale);

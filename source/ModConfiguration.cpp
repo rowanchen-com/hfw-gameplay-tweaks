@@ -130,7 +130,7 @@ namespace InternalModConfig
 			o.DebugMenuFontScale = 1.0f;
 
 		if (o.DebugMenuFontSize <= 0.0f)
-			o.DebugMenuFontSize = 16.0f;
+			o.DebugMenuFontSize = 20.0f;
 
 		// [Gameplay]
 		if (auto gameplay = Table["Gameplay"].as_table())

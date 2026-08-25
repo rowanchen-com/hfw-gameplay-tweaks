@@ -1,14 +1,13 @@
 #include "LogWindow.h"
+#include "TrainerToolWindow.h"
 
 namespace HRZ2::DebugUI
 {
 	void LogWindow::Render()
 	{
-		if (!ImGui::Begin(GetId().c_str(), &m_WindowOpen))
-		{
-			ImGui::End();
+		TrainerToolWindow window(GetId().c_str(), "日志窗口", &m_WindowOpen, ImVec2(780.0f, 560.0f));
+		if (!window)
 			return;
-		}
 
 		// Options menu
 		if (ImGui::BeginPopup("Options"))
@@ -93,7 +92,6 @@ namespace HRZ2::DebugUI
 			ImGui::SetScrollHereY(1.0f);
 
 		ImGui::EndChild();
-		ImGui::End();
 	}
 
 	bool LogWindow::Close()

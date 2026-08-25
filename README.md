@@ -13,7 +13,7 @@ Source code for the Horizon Forbidden West mod, with a complete Simplified Chine
 
 ## Menu controls
 
-- Press the configured debug-menu hotkey (backtick/tilde by default) to open or close the menu.
+- Press the configured debug-menu hotkey (`Insert` by default) to open or close the menu.
 - Use the arrow keys or `WASD` to select and adjust options.
 - Press `Enter` to activate an option, `Backspace` or `Escape` to return, or use the mouse.
 - The internal player-faction identifiers intentionally remain in English because they are game resource names rather than display text.

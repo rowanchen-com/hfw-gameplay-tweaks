@@ -9,6 +9,7 @@
 #include "../Core/JobHeaderCPU.h"
 #include "../Core/Player.h"
 #include "PlayerInventoryWindow.h"
+#include "TrainerToolWindow.h"
 
 namespace HRZ2::DebugUI
 {
@@ -73,13 +74,9 @@ namespace HRZ2::DebugUI
 
 	void PlayerInventoryWindow::Render()
 	{
-		ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
-
-		if (!ImGui::Begin(GetId().c_str(), &m_WindowOpen))
-		{
-			ImGui::End();
+		TrainerToolWindow window(GetId().c_str(), "玩家物品栏", &m_WindowOpen, ImVec2(720.0f, 720.0f));
+		if (!window)
 			return;
-		}
 
 		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "警告：");
 		ImGui::SameLine();
@@ -231,7 +228,6 @@ namespace HRZ2::DebugUI
 			ImGui::EndTable();
 		}
 
-		ImGui::End();
 	}
 
 	void PlayerInventoryWindow::DrawTableContextMenu(InventoryItem *Item, const GGUUID& ItemUUID)

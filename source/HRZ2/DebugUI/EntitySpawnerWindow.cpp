@@ -9,6 +9,7 @@
 #include "../Core/Player.h"
 #include "../PCore/UUID.h"
 #include "EntitySpawnerWindow.h"
+#include "TrainerToolWindow.h"
 
 namespace HRZ2::DebugUI
 {
@@ -24,13 +25,9 @@ namespace HRZ2::DebugUI
 
 	void EntitySpawnerWindow::Render()
 	{
-		ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
-
-		if (!ImGui::Begin(GetId().c_str(), &m_WindowOpen))
-		{
-			ImGui::End();
+		TrainerToolWindow window(GetId().c_str(), "实体生成器", &m_WindowOpen, ImVec2(700.0f, 760.0f));
+		if (!window)
 			return;
-		}
 
 		// Draw entity list
 		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###EntitySpawnerFilter");
@@ -156,7 +153,6 @@ namespace HRZ2::DebugUI
 		ImGui::TextDisabled("注意：部分名称缺失，可以在模组配置文件中手动添加。");
 		ImGui::PopTextWrapPos();
 		ImGui::EndDisabled();
-		ImGui::End();
 
 		RunSpawnCommands();
 		m_DoSpawnOnNextFrame = false;
