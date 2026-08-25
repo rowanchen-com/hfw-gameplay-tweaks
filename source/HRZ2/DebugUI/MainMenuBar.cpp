@@ -26,6 +26,7 @@
 #include "LogWindow.h"
 #include "MainMenuBar.h"
 #include "PlayerInventoryWindow.h"
+#include "TrainerValueEditorWindow.h"
 #include "WeatherSetupWindow.h"
 
 namespace
@@ -178,6 +179,17 @@ namespace HRZ2::DebugUI
 				}, TrainerCheats::IsAvailable(FeatureValue));
 		};
 
+		auto addValueEditor = [&](std::string Label, std::string Value, std::string Description,
+			TrainerValueEditorWindow::Mode EditorMode, TrainerCheats::Feature FeatureValue)
+		{
+			items.emplace_back(MenuItem {
+				.Label = std::move(Label), .Value = std::move(Value),
+				.Description = featureDescription(FeatureValue, std::move(Description)),
+				.Enabled = TrainerCheats::IsAvailable(FeatureValue), .IsSubmenu = true,
+				.Activate = [EditorMode]() { AddWindow(std::make_shared<TrainerValueEditorWindow>(EditorMode)); },
+			});
+		};
+
 		const auto currentPage = m_Navigation.back().PageId;
 		auto player = Player::GetLocalPlayer();
 		const bool playerAvailable = player && player->m_Entity;
@@ -276,18 +288,14 @@ namespace HRZ2::DebugUI
 			addFeatureToggle("无限生命", "持续将玩家生命值保持为 9999。", TrainerCheats::Feature::InfiniteHealth);
 			addFeatureToggle("超级伤害 / 一击必杀", "把对敌人的有效伤害提高到极高数值；部分特殊目标可能仍有剧情保护。",
 				TrainerCheats::Feature::SuperDamage);
-			addFeatureToggle("伤害倍率", "对敌人造成伤害时应用下面设置的倍率。", TrainerCheats::Feature::DamageMultiplier);
-			addValue("伤害倍率数值", std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()),
-				"左右键以 0.5 为步长调整，范围 1 到 100。",
-				[]() { TrainerCheats::SetDamageMultiplier(TrainerCheats::GetDamageMultiplier() - 0.5f); },
-				[]() { TrainerCheats::SetDamageMultiplier(TrainerCheats::GetDamageMultiplier() + 0.5f); },
-				TrainerCheats::IsAvailable(TrainerCheats::Feature::DamageMultiplier));
-			addFeatureToggle("防御倍率", "受到有效伤害时按下面的倍率降低伤害。", TrainerCheats::Feature::DefenseMultiplier);
-			addValue("防御倍率数值", std::format("{:.1f}x", TrainerCheats::GetDefenseMultiplier()),
-				"左右键以 0.5 为步长调整，范围 1 到 100。",
-				[]() { TrainerCheats::SetDefenseMultiplier(TrainerCheats::GetDefenseMultiplier() - 0.5f); },
-				[]() { TrainerCheats::SetDefenseMultiplier(TrainerCheats::GetDefenseMultiplier() + 0.5f); },
-				TrainerCheats::IsAvailable(TrainerCheats::Feature::DefenseMultiplier));
+			addValueEditor("伤害倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DamageMultiplier)
+				? std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()) : "关闭",
+				"打开二级窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DamageMultiplier,
+				TrainerCheats::Feature::DamageMultiplier);
+			addValueEditor("防御倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DefenseMultiplier)
+				? std::format("{:.1f}x", TrainerCheats::GetDefenseMultiplier()) : "关闭",
+				"打开二级窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DefenseMultiplier,
+				TrainerCheats::Feature::DefenseMultiplier);
 			addFeatureToggle("无限箭矢与陷阱", "使用箭矢或陷阱时把当前计数保持为 99。",
 				TrainerCheats::Feature::InfiniteArrowsAndTraps);
 			addFeatureToggle("弓箭瞬间蓄力", "拉弓时立即达到完整蓄力。", TrainerCheats::Feature::InstantBowCharge);
@@ -306,41 +314,28 @@ namespace HRZ2::DebugUI
 
 		case Page::Resources:
 		{
-			const auto addItemEditor = [&](const char *Name, TrainerCheats::Feature FeatureValue)
+			const auto addItemEditor = [&](const char *Name, TrainerCheats::Feature FeatureValue,
+				TrainerValueEditorWindow::Mode EditorMode)
 			{
-				addFeatureToggle(std::string("锁定") + Name + "数量", std::string("处理玩家") + Name + "堆叠时写入指定数量。", FeatureValue);
-				addValue(std::string(Name) + "数量", std::to_string(TrainerCheats::GetItemAmount(FeatureValue)),
-					"左右键以 100 为步长调整，范围 1 到 9999。",
-					[FeatureValue]()
-					{
-						const auto value = TrainerCheats::GetItemAmount(FeatureValue);
-						TrainerCheats::SetItemAmount(FeatureValue, value > 100 ? value - 100 : 1);
-					},
-					[FeatureValue]() { TrainerCheats::SetItemAmount(FeatureValue, TrainerCheats::GetItemAmount(FeatureValue) + 100); },
-					TrainerCheats::IsAvailable(FeatureValue));
+				addValueEditor(std::string("修改") + Name + "数量",
+					TrainerCheats::IsEnabled(FeatureValue) ? "等待应用" : "未启用",
+					std::string("打开二级窗口输入") + Name + "数量；默认不修改，只执行一次。", EditorMode, FeatureValue);
 			};
 
-			addItemEditor("工具", TrainerCheats::Feature::EditTools);
-			addItemEditor("弹药", TrainerCheats::Feature::EditAmmo);
-			addItemEditor("资源", TrainerCheats::Feature::EditResources);
+			addItemEditor("工具", TrainerCheats::Feature::EditTools, TrainerValueEditorWindow::Mode::ToolsAmount);
+			addItemEditor("弹药", TrainerCheats::Feature::EditAmmo, TrainerValueEditorWindow::Mode::AmmoAmount);
+			addItemEditor("资源", TrainerCheats::Feature::EditResources, TrainerValueEditorWindow::Mode::ResourcesAmount);
 			addFeatureToggle("无视制作与购买需求", "运行时跳过材料和购买条件检查。",
 				TrainerCheats::Feature::IgnoreCraftingRequirements);
-			addFeatureToggle("经验倍率", "获得经验时应用下面设置的倍率。", TrainerCheats::Feature::ExperienceMultiplier);
-			addValue("经验倍率数值", std::format("{:.1f}x", TrainerCheats::GetExperienceMultiplier()),
-				"左右键以 0.5 为步长调整，范围 1 到 100。",
-				[]() { TrainerCheats::SetExperienceMultiplier(TrainerCheats::GetExperienceMultiplier() - 0.5f); },
-				[]() { TrainerCheats::SetExperienceMultiplier(TrainerCheats::GetExperienceMultiplier() + 0.5f); },
-				TrainerCheats::IsAvailable(TrainerCheats::Feature::ExperienceMultiplier));
+			addValueEditor("经验倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::ExperienceMultiplier)
+				? std::format("{:.1f}x", TrainerCheats::GetExperienceMultiplier()) : "关闭",
+				"打开二级窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::ExperienceMultiplier,
+				TrainerCheats::Feature::ExperienceMultiplier);
 			addAction("获得大量经验", featureDescription(TrainerCheats::Feature::GrantExperience,
 				"排队一次 999999 经验修改，并在下一次经验结算时生效。"), []() { TrainerCheats::GrantExperience(); },
 				TrainerCheats::IsAvailable(TrainerCheats::Feature::GrantExperience));
-			addValue("技能点目标值", std::to_string(TrainerCheats::GetSkillPoints()), "左右键调整要写入的技能点数量。",
-				[]() { TrainerCheats::SetSkillPoints(TrainerCheats::GetSkillPoints() - 1); },
-				[]() { TrainerCheats::SetSkillPoints(TrainerCheats::GetSkillPoints() + 1); },
-				TrainerCheats::IsAvailable(TrainerCheats::Feature::EditSkillPoints));
-			addAction("应用技能点", featureDescription(TrainerCheats::Feature::EditSkillPoints,
-				"排队写入上面的技能点目标值，并在技能数据下次更新时生效。"), []() { TrainerCheats::ApplySkillPoints(); },
-				TrainerCheats::IsAvailable(TrainerCheats::Feature::EditSkillPoints));
+			addValueEditor("修改技能点", "未启用", "打开二级窗口输入技能点；确认后只执行一次。",
+				TrainerValueEditorWindow::Mode::SkillPoints, TrainerCheats::Feature::EditSkillPoints);
 			break;
 		}
 

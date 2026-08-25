@@ -35,10 +35,10 @@ namespace
 	std::atomic<float> g_damageMultiplier = 2.0f;
 	std::atomic<float> g_defenseMultiplier = 2.0f;
 	std::atomic<float> g_experienceMultiplier = 2.0f;
-	std::atomic_uint32_t g_toolsAmount = 999;
-	std::atomic_uint32_t g_ammoAmount = 999;
-	std::atomic_uint32_t g_resourcesAmount = 999;
-	std::atomic_uint32_t g_skillPoints = 99;
+	std::atomic_uint32_t g_toolsAmount = 0;
+	std::atomic_uint32_t g_ammoAmount = 0;
+	std::atomic_uint32_t g_resourcesAmount = 0;
+	std::atomic_uint32_t g_skillPoints = 0;
 	std::atomic_uint32_t g_applySkillPoints = 0;
 	std::atomic_uint32_t g_grantExperience = 0;
 
@@ -395,6 +395,7 @@ namespace HRZ2::TrainerCheats
 		case Feature::InfiniteSkillDuration: g_skillDurationPatch.Set(Enabled); break;
 		case Feature::IgnoreCraftingRequirements: g_craftingPatch.Set(Enabled); break;
 		case Feature::StealthMode: g_disableAIPatch.Set(Enabled); break;
+		case Feature::EditSkillPoints: if (!Enabled) g_applySkillPoints.store(0); break;
 		default: break;
 		}
 		g_enabled[ToIndex(Value)].store(Enabled ? 1U : 0U, std::memory_order_release);
@@ -420,7 +421,7 @@ namespace HRZ2::TrainerCheats
 
 	void SetItemAmount(Feature Value, uint32_t Amount)
 	{
-		Amount = std::clamp(Amount, 1U, 9999U);
+		Amount = std::clamp(Amount, 1U, 999999U);
 		switch (Value)
 		{
 		case Feature::EditTools: g_toolsAmount.store(Amount); break;
@@ -428,6 +429,14 @@ namespace HRZ2::TrainerCheats
 		case Feature::EditResources: g_resourcesAmount.store(Amount); break;
 		default: break;
 		}
+	}
+
+	void ApplyItemAmountOnce(Feature Value, uint32_t Amount)
+	{
+		if (Value != Feature::EditTools && Value != Feature::EditAmmo && Value != Feature::EditResources)
+			return;
+		SetItemAmount(Value, Amount);
+		SetEnabled(Value, true);
 	}
 
 	uint32_t GetSkillPoints() { return g_skillPoints.load(); }
@@ -754,6 +763,7 @@ namespace
 			Xbyak::Label tools, ammo, resources, writeValue, restore;
 			code.push(rax);
 			code.push(rdx);
+			code.push(r11);
 			code.mov(rax, reinterpret_cast<std::uintptr_t>(&g_shouldEditItem));
 			code.cmp(dword[rax], 1);
 			code.jne(restore);
@@ -768,22 +778,22 @@ namespace
 			code.jmp(restore);
 
 			code.L(tools);
-			code.mov(rax, FlagAddress(Feature::EditTools));
-			code.cmp(dword[rax], 0);
+			code.mov(r11, FlagAddress(Feature::EditTools));
+			code.cmp(dword[r11], 0);
 			code.je(restore);
 			code.mov(rax, reinterpret_cast<std::uintptr_t>(&g_toolsAmount));
 			code.jmp(writeValue);
 
 			code.L(ammo);
-			code.mov(rax, FlagAddress(Feature::EditAmmo));
-			code.cmp(dword[rax], 0);
+			code.mov(r11, FlagAddress(Feature::EditAmmo));
+			code.cmp(dword[r11], 0);
 			code.je(restore);
 			code.mov(rax, reinterpret_cast<std::uintptr_t>(&g_ammoAmount));
 			code.jmp(writeValue);
 
 			code.L(resources);
-			code.mov(rax, FlagAddress(Feature::EditResources));
-			code.cmp(dword[rax], 0);
+			code.mov(r11, FlagAddress(Feature::EditResources));
+			code.cmp(dword[r11], 0);
 			code.je(restore);
 			code.mov(rax, reinterpret_cast<std::uintptr_t>(&g_resourcesAmount));
 			code.L(writeValue);
@@ -791,8 +801,10 @@ namespace
 			code.test(edx, edx);
 			code.jle(restore);
 			code.mov(dword[rcx + 0x50], edx);
+			code.mov(dword[r11], 0);
 
 			code.L(restore);
+			code.pop(r11);
 			code.pop(rdx);
 			code.pop(rax);
 			code.add(edi, dword[rcx + 0x50]);

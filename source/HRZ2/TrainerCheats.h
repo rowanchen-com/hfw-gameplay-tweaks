@@ -55,6 +55,7 @@ namespace HRZ2
 
 		uint32_t GetItemAmount(Feature Value);
 		void SetItemAmount(Feature Value, uint32_t Amount);
+		void ApplyItemAmountOnce(Feature Value, uint32_t Amount);
 		uint32_t GetSkillPoints();
 		void SetSkillPoints(uint32_t Amount);
 		void ApplySkillPoints();
