@@ -211,26 +211,7 @@ namespace HRZ2::DebugUI
 			auto debugSettings = DebugSettings::GetInstance();
 			const bool debugAvailable = debugSettings != nullptr;
 
-			addToggle("穿墙模式（丶 / ~ 快捷开启关闭）", "让埃洛伊脱离碰撞并使用自由移动。", m_FreeCamMode == FreeCamMode::Noclip, [](bool Enabled)
-			{
-				if ((m_FreeCamMode == FreeCamMode::Noclip) != Enabled) ToggleNoclip();
-			}, playerAvailable);
-			addToggle("自由镜头", "让镜头脱离玩家移动；按住鼠标右键旋转。", m_FreeCamMode == FreeCamMode::Free, [](bool Enabled)
-			{
-				if ((m_FreeCamMode == FreeCamMode::Free) != Enabled) ToggleFreeflyCamera();
-			}, playerAvailable);
-			addValueEditor("无限跳高度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::InfiniteJump)
-				? std::format("{:.1f}x", TrainerCheats::GetInfiniteJumpHeightMultiplier()) : "关闭",
-				"启用后松开并重新按下空格可在空中再次起跳；本项只改高度，下降速度可在下一项独立设置。",
-				TrainerValueEditorWindow::Mode::InfiniteJump, TrainerCheats::Feature::InfiniteJump);
-			addValueEditor("移动速度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::MovementSpeed)
-				? std::format("{:.1f}x", TrainerCheats::GetMovementSpeedMultiplier()) : "关闭",
-				"独立调整水平移动速度；1.0 为原版，默认输入值为 3.0。",
-				TrainerValueEditorWindow::Mode::MovementSpeed, TrainerCheats::Feature::MovementSpeed);
-			addValueEditor("下降速度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::FallSpeed)
-				? std::format("{:.2f}x", TrainerCheats::GetFallSpeedMultiplier()) : "关闭",
-				"独立调整下降速度；1.0 为原版，默认输入值为 0.5。",
-				TrainerValueEditorWindow::Mode::FallSpeed, TrainerCheats::Feature::FallSpeed);
+			// Player state and survival
 			addToggle("完全无敌", "合并引擎无敌与无视命中判定；特征码不可用时仍保留引擎无敌。", m_EnableGodMode, [](bool Enabled)
 			{
 				TrainerCheats::SetEnabled(TrainerCheats::Feature::IgnoreHits, Enabled);
@@ -261,6 +242,25 @@ namespace HRZ2::DebugUI
 				TrainerCheats::Feature::DefenseMultiplier);
 			addFeatureToggle("无限氧气", "水下活动时不再消耗氧气。", TrainerCheats::Feature::InfiniteOxygen);
 			addFeatureToggle("药用浆果袋保持满额", "消耗药用浆果后立即恢复到当前容量。", TrainerCheats::Feature::MaxMedicinePouch);
+			addFeatureToggle("隐身模式", "同时关闭相关 AI 发现分支并持续清除警觉状态。", TrainerCheats::Feature::StealthMode);
+
+			// Combat and damage
+			addFeatureToggle("超级伤害 / 一击必杀", "把对敌人的有效伤害提高到极高数值；部分特殊目标可能仍有剧情保护。",
+				TrainerCheats::Feature::SuperDamage);
+			addValueEditor("伤害倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DamageMultiplier)
+				? std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()) : "关闭",
+				"打开数字窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DamageMultiplier,
+				TrainerCheats::Feature::DamageMultiplier);
+			addFeatureToggle("弓箭瞬间蓄力", "拉弓时立即达到完整蓄力。", TrainerCheats::Feature::InstantBowCharge);
+			addToggle("无限武器耐力", "武器相关耐力不会耗尽。", debugAvailable && debugSettings->m_Inexhaustible, [](bool Enabled)
+			{
+				if (auto s = DebugSettings::GetInstance()) s->m_Inexhaustible = Enabled;
+			}, debugAvailable);
+			addFeatureToggle("无限专注", "持续恢复武器轮盘与瞄准使用的专注值。", TrainerCheats::Feature::InfiniteFocus);
+			addFeatureToggle("无限勇气", "持续补充勇气激增所需的勇气值。", TrainerCheats::Feature::InfiniteValor);
+			addFeatureToggle("无限技能持续时间", "冻结受支持技能的剩余持续时间。", TrainerCheats::Feature::InfiniteSkillDuration);
+
+			// Ammunition
 			addToggle("无限备用弹药", "射击时不消耗物品栏中的备用弹药。", debugAvailable && debugSettings->m_InfiniteAmmo, [](bool Enabled)
 			{
 				if (auto s = DebugSettings::GetInstance())
@@ -280,21 +280,30 @@ namespace HRZ2::DebugUI
 			}, debugAvailable);
 			addFeatureToggle("无限箭矢与陷阱", "将受支持的箭矢与陷阱计数保持为 99；可与上面任一种 DLL 弹药模式同时使用。",
 				TrainerCheats::Feature::InfiniteArrowsAndTraps);
-			addToggle("无限武器耐力", "武器相关耐力不会耗尽。", debugAvailable && debugSettings->m_Inexhaustible, [](bool Enabled)
+
+			// Movement and exploration
+			addValueEditor("移动速度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::MovementSpeed)
+				? std::format("{:.1f}x", TrainerCheats::GetMovementSpeedMultiplier()) : "关闭",
+				"独立调整水平移动速度；1.0 为原版，默认输入值为 3.0。",
+				TrainerValueEditorWindow::Mode::MovementSpeed, TrainerCheats::Feature::MovementSpeed);
+			addValueEditor("无限跳高度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::InfiniteJump)
+				? std::format("{:.1f}x", TrainerCheats::GetInfiniteJumpHeightMultiplier()) : "关闭",
+				"启用后松开并重新按下空格可在空中再次起跳；本项只改高度，下降速度可在下一项独立设置。",
+				TrainerValueEditorWindow::Mode::InfiniteJump, TrainerCheats::Feature::InfiniteJump);
+			addValueEditor("下降速度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::FallSpeed)
+				? std::format("{:.2f}x", TrainerCheats::GetFallSpeedMultiplier()) : "关闭",
+				"独立调整下降速度；1.0 为原版，默认输入值为 0.5。",
+				TrainerValueEditorWindow::Mode::FallSpeed, TrainerCheats::Feature::FallSpeed);
+			addToggle("穿墙模式（丶 / ~ 快捷开启关闭）", "让埃洛伊脱离碰撞并使用自由移动。", m_FreeCamMode == FreeCamMode::Noclip, [](bool Enabled)
 			{
-				if (auto s = DebugSettings::GetInstance()) s->m_Inexhaustible = Enabled;
-			}, debugAvailable);
-			addFeatureToggle("无限专注", "持续恢复武器轮盘与瞄准使用的专注值。", TrainerCheats::Feature::InfiniteFocus);
-			addFeatureToggle("无限勇气", "持续补充勇气激增所需的勇气值。", TrainerCheats::Feature::InfiniteValor);
-			addFeatureToggle("无限技能持续时间", "冻结受支持技能的剩余持续时间。", TrainerCheats::Feature::InfiniteSkillDuration);
-			addFeatureToggle("弓箭瞬间蓄力", "拉弓时立即达到完整蓄力。", TrainerCheats::Feature::InstantBowCharge);
-			addFeatureToggle("超级伤害 / 一击必杀", "把对敌人的有效伤害提高到极高数值；部分特殊目标可能仍有剧情保护。",
-				TrainerCheats::Feature::SuperDamage);
-			addValueEditor("伤害倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DamageMultiplier)
-				? std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()) : "关闭",
-				"打开数字窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DamageMultiplier,
-				TrainerCheats::Feature::DamageMultiplier);
-			addFeatureToggle("隐身模式", "同时关闭相关 AI 发现分支并持续清除警觉状态。", TrainerCheats::Feature::StealthMode);
+				if ((m_FreeCamMode == FreeCamMode::Noclip) != Enabled) ToggleNoclip();
+			}, playerAvailable);
+			addToggle("自由镜头", "让镜头脱离玩家移动；按住鼠标右键旋转。", m_FreeCamMode == FreeCamMode::Free, [](bool Enabled)
+			{
+				if ((m_FreeCamMode == FreeCamMode::Free) != Enabled) ToggleFreeflyCamera();
+			}, playerAvailable);
+
+			// Special and debug
 			addFeatureToggle("锁定试炼时间", "冻结狩猎场等受支持试炼的计时器。", TrainerCheats::Feature::FreezeTrialTimer);
 			addToggle("自动中立阵营", "持续将玩家阵营恢复为中立。", m_EnableAutoNeutralFaction,
 				[](bool Enabled) { m_EnableAutoNeutralFaction = Enabled; }, playerAvailable);
