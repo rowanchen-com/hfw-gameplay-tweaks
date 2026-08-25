@@ -50,9 +50,19 @@ jobs:
         run: |
           $artifactDir = Join-Path $PWD "artifact"
           New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
-          Copy-Item "bin/final-universal/Release/winhttp.dll" $artifactDir
-          Copy-Item "resources/mod_config.ini" $artifactDir
-          Copy-Item "resources/mod_DamageSettings.ini" $artifactDir
+
+          $dllCandidates = @(
+            Get-ChildItem -LiteralPath "bin/final-universal" -Filter "winhttp.dll" -File -Recurse
+          )
+          if ($dllCandidates.Count -ne 1) {
+            $foundPaths = ($dllCandidates | ForEach-Object { $_.FullName }) -join "`n"
+            throw "Expected exactly one built winhttp.dll, found $($dllCandidates.Count).`n$foundPaths"
+          }
+
+          Write-Host "Staging DLL: $($dllCandidates[0].FullName)"
+          Copy-Item -LiteralPath $dllCandidates[0].FullName -Destination $artifactDir
+          Copy-Item -LiteralPath "resources/mod_config.ini" -Destination $artifactDir
+          Copy-Item -LiteralPath "resources/mod_DamageSettings.ini" -Destination $artifactDir
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
