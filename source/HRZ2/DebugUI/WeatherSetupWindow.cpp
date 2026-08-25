@@ -54,7 +54,7 @@ namespace HRZ2::DebugUI
 
 	void WeatherSetupWindow::Render()
 	{
-		TrainerToolWindow window(GetId().c_str(), "天气设置", &m_WindowOpen, ImVec2(700.0f, 700.0f));
+		TrainerToolWindow window(GetId().c_str(), "天气设置", &m_WindowOpen, ImVec2(1080.0f, 880.0f));
 		if (!window)
 			return;
 
@@ -104,7 +104,7 @@ namespace HRZ2::DebugUI
 			!m_StreamerRequestPending.load();
 		ImGui::BeginDisabled(!setIsAllowed);
 
-		if ((ImGui::Button("应用###Set", ImVec2(180.0f * uiScale, 0.0f)) || m_DoSetOnNextFrame) && setIsAllowed)
+		if ((ImGui::Button("应用###Set", ImVec2(260.0f * uiScale, 0.0f)) || m_DoSetOnNextFrame) && setIsAllowed)
 		{
 			const auto targetSetupUUID = ModConfiguration.CachedWeatherSetups[m_LastSelectedIndex].UUID;
 
@@ -142,7 +142,7 @@ namespace HRZ2::DebugUI
 
 		ImGui::Spacing();
 		ImGui::PushTextWrapPos(0.0f);
-		ImGui::TextDisabled("注意：部分名称缺失，可以在模组配置文件中手动添加。");
+		ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.38f, 1.0f), "注意：部分名称缺失，可以在模组配置文件中手动添加。");
 		ImGui::PopTextWrapPos();
 		ImGui::EndDisabled();
 

@@ -6,7 +6,7 @@ namespace HRZ2::DebugUI
 	float GetTrainerUIScale()
 	{
 		const float displayHeight = ImGui::GetIO().DisplaySize.y;
-		return std::clamp(displayHeight / 1080.0f, 0.85f, 1.50f);
+		return std::clamp(displayHeight / 1080.0f, 1.00f, 2.00f);
 	}
 
 	TrainerToolWindow::TrainerToolWindow(const char *Id, const char *Title, bool *Open, const ImVec2& DefaultSize)
@@ -17,8 +17,8 @@ namespace HRZ2::DebugUI
 			std::max(360.0f, displaySize.x - 32.0f * scale),
 			std::max(320.0f, displaySize.y - 32.0f * scale));
 		const ImVec2 minimumSize(
-			std::min(680.0f * scale, maximumSize.x),
-			std::min(640.0f * scale, maximumSize.y));
+			std::min(960.0f * scale, maximumSize.x),
+			std::min(950.0f * scale, maximumSize.y));
 		const ImVec2 scaledDefaultSize(
 			std::clamp(DefaultSize.x * scale, minimumSize.x, maximumSize.x),
 			std::clamp(DefaultSize.y * scale, minimumSize.y, maximumSize.y));
@@ -98,7 +98,11 @@ namespace HRZ2::DebugUI
 
 		ImGui::SetCursorScreenPos(ImVec2(windowPosition.x, windowPosition.y + headerHeight));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * scale, 16.0f * scale));
-		ImGui::BeginChild("##TrainerToolContent", ImVec2(0.0f, 0.0f), false);
+		ImGui::BeginChild(
+			"##TrainerToolContent",
+			ImVec2(0.0f, 0.0f),
+			false,
+			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 		ImGui::PopStyleVar();
 		m_ContentBegun = true;
 	}

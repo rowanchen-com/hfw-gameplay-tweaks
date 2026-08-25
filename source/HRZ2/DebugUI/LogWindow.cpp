@@ -5,7 +5,7 @@ namespace HRZ2::DebugUI
 {
 	void LogWindow::Render()
 	{
-		TrainerToolWindow window(GetId().c_str(), "日志窗口", &m_WindowOpen, ImVec2(780.0f, 560.0f));
+		TrainerToolWindow window(GetId().c_str(), "日志窗口", &m_WindowOpen, ImVec2(1120.0f, 820.0f));
 		if (!window)
 			return;
 

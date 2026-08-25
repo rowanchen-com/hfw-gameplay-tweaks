@@ -7,7 +7,7 @@ Source code for the Horizon Forbidden West mod, with a complete Simplified Chine
 - Translates the gameplay, cheats, miscellaneous, entity spawner, inventory, weather, and log interfaces.
 - Loads a CJK-capable font so Chinese text renders correctly in Dear ImGui.
 - Includes localized `mod_config.ini` and `mod_DamageSettings.ini` resources without changing the original cheat defaults.
-- Uses `C:/Windows/Fonts/msyh.ttc` at a larger resolution-aware size by default. `DebugMenuFontPath`, `DebugMenuFontSize`, and `DebugMenuFontScale` can be changed under `[General]`.
+- Uses the Microsoft YaHei Bold font (`C:/Windows/Fonts/msyhbd.ttc`) at an extra-large resolution-aware size by default. `DebugMenuFontPath`, `DebugMenuFontSize`, and `DebugMenuFontScale` can be changed under `[General]`.
 - Replaces the narrow menu bar with a GTA-style interaction menu using hierarchical pages, keyboard navigation, mouse support, descriptions, and page counters.
 - Uses the Windows hardware cursor by default so the pointer remains smooth when frame generation is enabled. Set `DebugMenuUseHardwareCursor = false` to restore Dear ImGui's software cursor.
 

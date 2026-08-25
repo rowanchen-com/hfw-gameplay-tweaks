@@ -25,7 +25,7 @@ namespace HRZ2::DebugUI
 
 	void EntitySpawnerWindow::Render()
 	{
-		TrainerToolWindow window(GetId().c_str(), "实体生成器", &m_WindowOpen, ImVec2(700.0f, 760.0f));
+		TrainerToolWindow window(GetId().c_str(), "实体生成器", &m_WindowOpen, ImVec2(1180.0f, 980.0f));
 		if (!window)
 			return;
 
@@ -33,8 +33,11 @@ namespace HRZ2::DebugUI
 		const float uiScale = GetTrainerUIScale();
 		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###EntitySpawnerFilter");
 		ImGui::Checkbox("显示内部资源 ID（高级）###ShowSpawnerResourceIds", &m_ShowResourceIds);
+		const float listHeight = std::max(
+			ImGui::GetFrameHeightWithSpacing() * 2.0f,
+			ImGui::GetContentRegionAvail().y - 500.0f * uiScale);
 
-		if (ImGui::BeginListBox("##SpawnSetupSelector", ImVec2(-FLT_MIN, -360.0f * uiScale)))
+		if (ImGui::BeginListBox("##SpawnSetupSelector", ImVec2(-FLT_MIN, listHeight)))
 		{
 			for (size_t i = 0; i < ModConfiguration.CachedSpawnSetups.size(); i++)
 			{
@@ -81,9 +84,19 @@ namespace HRZ2::DebugUI
 
 		ImGui::Separator();
 		ImGui::BeginDisabled(!allowSpawn);
-		ImGui::PushItemWidth(360.0f * uiScale);
+		const float columnSpacing = ImGui::GetStyle().ItemSpacing.x;
+		const float columnWidth = (ImGui::GetContentRegionAvail().x - columnSpacing) * 0.5f;
+
+		ImGui::BeginGroup();
+		ImGui::TextUnformatted("生成数量");
+		ImGui::SetNextItemWidth(columnWidth);
 		ImGui::InputInt("##entitycount", &spawnCount);
 		spawnCount = std::max(spawnCount, 1);
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		ImGui::BeginGroup();
+		ImGui::TextUnformatted("玩家阵营");
+		ImGui::SetNextItemWidth(columnWidth);
 		{
 			// Draw faction list
 			auto& modEvents = ModCoreEvents::GetInstance();
@@ -124,25 +137,33 @@ namespace HRZ2::DebugUI
 				ImGui::EndCombo();
 			}
 		}
-		ImGui::PopItemWidth();
+		ImGui::EndGroup();
 		ImGui::Spacing();
-		ImGui::RadioButton("在玩家位置生成###SpawnAtPlayerPosition", &spawnLocationType, 0);
-		ImGui::RadioButton("在准星位置生成###SpawnAtCrosshairPosition", &spawnLocationType, 1);
-		ImGui::RadioButton("在自定义位置生成###SpawnAtCustomPosition", &spawnLocationType, 2);
+		ImGui::TextUnformatted("生成位置");
+		ImGui::RadioButton("玩家位置###SpawnAtPlayerPosition", &spawnLocationType, 0);
+		ImGui::SameLine();
+		ImGui::RadioButton("准星位置###SpawnAtCrosshairPosition", &spawnLocationType, 1);
+		ImGui::SameLine();
+		ImGui::RadioButton("自定义位置###SpawnAtCustomPosition", &spawnLocationType, 2);
 		ImGui::Spacing();
 
 		if (spawnLocationType == 2)
 		{
-			ImGui::PushItemWidth(260.0f * uiScale);
+			ImGui::TextUnformatted("自定义坐标");
+			const float coordinateWidth = (ImGui::GetContentRegionAvail().x - columnSpacing * 2.0f) / 3.0f - ImGui::GetFontSize() * 1.5f;
+			ImGui::SetNextItemWidth(coordinateWidth);
 			ImGui::InputDouble("X", &customSpawnPosition.X, 1.0, 20.0, "%.3f");
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(coordinateWidth);
 			ImGui::InputDouble("Y", &customSpawnPosition.Y, 1.0, 20.0, "%.3f");
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(coordinateWidth);
 			ImGui::InputDouble("Z", &customSpawnPosition.Z, 1.0, 20.0, "%.3f");
-			ImGui::PopItemWidth();
 			ImGui::Spacing();
 		}
 
 		// Spawn button
-		if (ImGui::Button("生成###Spawn", ImVec2(180.0f * uiScale, 0.0f)) || (m_DoSpawnOnNextFrame && allowSpawn))
+		if (ImGui::Button("生成###Spawn", ImVec2(260.0f * uiScale, 0.0f)) || (m_DoSpawnOnNextFrame && allowSpawn))
 		{
 			if (auto transform = GetSpawnTransform(spawnLocationType, customSpawnPosition))
 			{
@@ -157,12 +178,12 @@ namespace HRZ2::DebugUI
 			}
 		}
 
+		ImGui::EndDisabled();
 		ImGui::Spacing();
 		ImGui::PushTextWrapPos(0.0f);
-		ImGui::TextDisabled("注意：许多人形和脚本实体会导致游戏崩溃。");
-		ImGui::TextDisabled("注意：部分名称缺失，可以在模组配置文件中手动添加。");
+		ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.38f, 1.0f), "注意：许多人形和脚本实体会导致游戏崩溃。");
+		ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.38f, 1.0f), "注意：部分名称缺失，可以在模组配置文件中手动添加。");
 		ImGui::PopTextWrapPos();
-		ImGui::EndDisabled();
 
 		RunSpawnCommands();
 		m_DoSpawnOnNextFrame = false;

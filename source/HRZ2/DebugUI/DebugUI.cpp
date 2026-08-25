@@ -62,23 +62,33 @@ namespace HRZ2::DebugUI
 			return 1.0f;
 
 		const float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
-		return std::clamp(clientHeight / 1080.0f, 0.85f, 1.50f);
+		return std::clamp(clientHeight / 1080.0f, 1.00f, 2.00f);
 	}
 
 	static ImFont *LoadChineseFont(ImGuiIO& IO, float UIScale)
 	{
 		std::vector<std::filesystem::path> fontCandidates;
-		const float fontSize = std::max(13.0f, ModConfiguration.DebugMenuFontSize * UIScale);
+		// Keep legacy 20/26 px configuration files from silently shrinking the redesigned UI.
+		const float fontSize = std::max(32.0f, ModConfiguration.DebugMenuFontSize) * UIScale;
 
 		if (!ModConfiguration.DebugMenuFontPath.empty())
 		{
 			std::filesystem::path configuredPath(ModConfiguration.DebugMenuFontPath);
-			fontCandidates.emplace_back(
-				configuredPath.is_absolute() ? configuredPath : InternalModConfig::GetModRelativePath(ModConfiguration.DebugMenuFontPath));
+			configuredPath = configuredPath.is_absolute()
+				? configuredPath
+				: InternalModConfig::GetModRelativePath(ModConfiguration.DebugMenuFontPath);
+
+			// Existing installations commonly point at regular Microsoft YaHei. Prefer its bold
+			// companion automatically so replacing only the DLL still produces the intended weight.
+			if (configuredPath.filename() == "msyh.ttc")
+				fontCandidates.emplace_back(configuredPath.parent_path() / "msyhbd.ttc");
+
+			fontCandidates.emplace_back(configuredPath);
 		}
 
-		fontCandidates.emplace_back("C:/Windows/Fonts/msyh.ttc");
+		fontCandidates.emplace_back("C:/Windows/Fonts/msyhbd.ttc");
 		fontCandidates.emplace_back("C:/Windows/Fonts/simhei.ttf");
+		fontCandidates.emplace_back("C:/Windows/Fonts/msyh.ttc");
 		fontCandidates.emplace_back("C:/Windows/Fonts/simsun.ttc");
 
 		for (const auto& fontPath : fontCandidates)
@@ -90,6 +100,8 @@ namespace HRZ2::DebugUI
 
 			ImFontConfig fontConfig {};
 			fontConfig.FontNo = 0;
+			fontConfig.PixelSnapH = true;
+			fontConfig.RasterizerMultiply = 1.20f;
 
 			const auto fontPathString = fontPath.string();
 			if (auto font = IO.Fonts->AddFontFromFileTTF(
