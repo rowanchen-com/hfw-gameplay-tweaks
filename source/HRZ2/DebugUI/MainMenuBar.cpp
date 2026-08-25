@@ -440,12 +440,12 @@ namespace HRZ2::DebugUI
 		auto& state = m_Navigation.back();
 		state.SelectedIndex = std::min(state.SelectedIndex, Items.size() - 1);
 
-		const float scale = std::clamp(io.DisplaySize.y / 1080.0f, 1.00f, 2.00f);
-		const float width = std::min(600.0f * scale, io.DisplaySize.x - 36.0f * scale);
-		const float headerHeight = 120.0f * scale;
-		const float breadcrumbHeight = 54.0f * scale;
-		const float rowHeight = 56.0f * scale;
-		const float footerHeight = 190.0f * scale;
+		const float scale = std::clamp(io.DisplaySize.y / 1080.0f, 0.85f, 1.50f);
+		const float width = std::min(520.0f * scale, io.DisplaySize.x - 36.0f * scale);
+		const float headerHeight = 96.0f * scale;
+		const float breadcrumbHeight = 42.0f * scale;
+		const float rowHeight = 43.0f * scale;
+		const float footerHeight = 150.0f * scale;
 		const size_t maximumVisibleRows = 12;
 		const float fixedHeight = headerHeight + breadcrumbHeight + footerHeight;
 		const float availableRowsHeight = std::max(rowHeight, io.DisplaySize.y - 36.0f * scale - fixedHeight);
@@ -493,9 +493,9 @@ namespace HRZ2::DebugUI
 				IM_COL32(17, 124, 137, 255), IM_COL32(7, 60, 79, 255),
 				IM_COL32(4, 39, 53, 255), IM_COL32(10, 83, 96, 255));
 			draw->AddRectFilled(ImVec2(headerMin.x, headerMax.y - 4.0f * scale), headerMax, IM_COL32(236, 178, 66, 255));
-			draw->AddText(font, fontSize * 1.28f, ImVec2(headerMin.x + 22.0f * scale, headerMin.y + 18.0f * scale),
+			draw->AddText(font, fontSize * 1.28f, ImVec2(headerMin.x + 20.0f * scale, headerMin.y + 16.0f * scale),
 				IM_COL32(255, 255, 255, 255), "HORIZON FORBIDDEN WEST");
-			draw->AddText(font, fontSize, ImVec2(headerMin.x + 23.0f * scale, headerMin.y + 70.0f * scale),
+			draw->AddText(font, fontSize * 0.95f, ImVec2(headerMin.x + 21.0f * scale, headerMin.y + 58.0f * scale),
 				IM_COL32(238, 251, 252, 255), "游戏调整与修改器菜单");
 
 			ImGui::SetCursorScreenPos(ImVec2(windowPosition.x, windowPosition.y + headerHeight));
@@ -569,15 +569,15 @@ namespace HRZ2::DebugUI
 
 			const auto pageCounter = std::format("{} / {}", state.SelectedIndex + 1, Items.size());
 			const auto counterWidth = ImGui::CalcTextSize(pageCounter.c_str()).x;
-			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMax.x - counterWidth - 20.0f * scale, footerMin.y + 12.0f * scale),
+			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMax.x - counterWidth - 16.0f * scale, footerMin.y + 8.0f * scale),
 				IM_COL32(240, 184, 72, 255), pageCounter.c_str());
-			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMin.x + 20.0f * scale, footerMin.y + 12.0f * scale),
+			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMin.x + 16.0f * scale, footerMin.y + 8.0f * scale),
 				IM_COL32(242, 250, 251, 255), "方向键 / WASD：选择");
-			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMin.x + 20.0f * scale, footerMin.y + 50.0f * scale),
+			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMin.x + 16.0f * scale, footerMin.y + 37.0f * scale),
 				IM_COL32(242, 250, 251, 255), "回车：确认  退格：返回  INS：关闭");
 			const auto& description = Items[state.SelectedIndex].Description;
-			draw->AddText(font, fontSize, ImVec2(footerMin.x + 20.0f * scale, footerMin.y + 96.0f * scale),
-				IM_COL32(255, 255, 255, 255), description.c_str(), nullptr, width - 40.0f * scale);
+			draw->AddText(font, fontSize, ImVec2(footerMin.x + 16.0f * scale, footerMin.y + 72.0f * scale),
+				IM_COL32(255, 255, 255, 255), description.c_str(), nullptr, width - 32.0f * scale);
 
 			if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 				requestedBack = true;

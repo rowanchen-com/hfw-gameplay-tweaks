@@ -74,7 +74,7 @@ namespace HRZ2::DebugUI
 
 	void PlayerInventoryWindow::Render()
 	{
-		TrainerToolWindow window(GetId().c_str(), "玩家物品栏", &m_WindowOpen, ImVec2(1120.0f, 900.0f));
+		TrainerToolWindow window(GetId().c_str(), "玩家物品栏", &m_WindowOpen, ImVec2(880.0f, 760.0f));
 		if (!window)
 			return;
 

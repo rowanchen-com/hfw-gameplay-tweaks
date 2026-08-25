@@ -62,14 +62,14 @@ namespace HRZ2::DebugUI
 			return 1.0f;
 
 		const float clientHeight = static_cast<float>(clientRect.bottom - clientRect.top);
-		return std::clamp(clientHeight / 1080.0f, 1.00f, 2.00f);
+		return std::clamp(clientHeight / 1080.0f, 0.85f, 1.50f);
 	}
 
 	static ImFont *LoadChineseFont(ImGuiIO& IO, float UIScale)
 	{
 		std::vector<std::filesystem::path> fontCandidates;
-		// Keep legacy 20/26 px configuration files from silently shrinking the redesigned UI.
-		const float fontSize = std::max(32.0f, ModConfiguration.DebugMenuFontSize) * UIScale;
+		// Keep legacy 20 px configuration files from silently shrinking the redesigned UI.
+		const float fontSize = std::max(26.0f, ModConfiguration.DebugMenuFontSize) * UIScale;
 
 		if (!ModConfiguration.DebugMenuFontPath.empty())
 		{

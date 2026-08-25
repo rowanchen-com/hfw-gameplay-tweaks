@@ -6,7 +6,7 @@ namespace HRZ2::DebugUI
 	float GetTrainerUIScale()
 	{
 		const float displayHeight = ImGui::GetIO().DisplaySize.y;
-		return std::clamp(displayHeight / 1080.0f, 1.00f, 2.00f);
+		return std::clamp(displayHeight / 1080.0f, 0.85f, 1.50f);
 	}
 
 	TrainerToolWindow::TrainerToolWindow(const char *Id, const char *Title, bool *Open, const ImVec2& DefaultSize)
@@ -14,7 +14,7 @@ namespace HRZ2::DebugUI
 		const float scale = GetTrainerUIScale();
 		const auto displaySize = ImGui::GetIO().DisplaySize;
 		const float screenMargin = 16.0f * scale;
-		const float mainMenuWidth = std::min(600.0f * scale, displaySize.x - 36.0f * scale);
+		const float mainMenuWidth = std::min(520.0f * scale, displaySize.x - 36.0f * scale);
 		const float mainMenuX = std::max(
 			18.0f * scale,
 			std::min(34.0f * scale, displaySize.x - mainMenuWidth - 18.0f * scale));
@@ -23,14 +23,14 @@ namespace HRZ2::DebugUI
 		const ImVec2 screenMaximumSize(
 			std::max(360.0f, displaySize.x - 32.0f * scale),
 			std::max(320.0f, displaySize.y - 32.0f * scale));
-		const float minimumWidth = std::min(900.0f * scale, screenMaximumSize.x);
+		const float minimumWidth = std::min(800.0f * scale, screenMaximumSize.x);
 		const bool canPlaceBesideMainMenu = availableRightWidth >= minimumWidth;
 		const ImVec2 maximumSize(
 			canPlaceBesideMainMenu ? availableRightWidth : screenMaximumSize.x,
 			screenMaximumSize.y);
 		const ImVec2 minimumSize(
 			std::min(minimumWidth, maximumSize.x),
-			std::min(950.0f * scale, maximumSize.y));
+			std::min(760.0f * scale, maximumSize.y));
 		const ImVec2 scaledDefaultSize(
 			std::clamp(DefaultSize.x * scale, minimumSize.x, maximumSize.x),
 			std::clamp(DefaultSize.y * scale, minimumSize.y, maximumSize.y));
@@ -41,7 +41,7 @@ namespace HRZ2::DebugUI
 		const float toolWindowY = std::clamp(72.0f * scale, screenMargin, maximumY);
 
 		ImGui::SetNextWindowPos(ImVec2(toolWindowX, toolWindowY), ImGuiCond_Appearing);
-		ImGui::SetNextWindowSize(scaledDefaultSize, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(scaledDefaultSize, ImGuiCond_Appearing);
 		ImGui::SetNextWindowSizeConstraints(minimumSize, maximumSize);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);

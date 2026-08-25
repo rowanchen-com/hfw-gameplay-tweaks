@@ -54,7 +54,7 @@ namespace HRZ2::DebugUI
 
 	void WeatherSetupWindow::Render()
 	{
-		TrainerToolWindow window(GetId().c_str(), "天气设置", &m_WindowOpen, ImVec2(1080.0f, 880.0f));
+		TrainerToolWindow window(GetId().c_str(), "天气设置", &m_WindowOpen, ImVec2(840.0f, 740.0f));
 		if (!window)
 			return;
 

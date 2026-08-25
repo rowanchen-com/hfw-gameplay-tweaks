@@ -25,7 +25,7 @@ namespace HRZ2::DebugUI
 
 	void EntitySpawnerWindow::Render()
 	{
-		TrainerToolWindow window(GetId().c_str(), "实体生成器", &m_WindowOpen, ImVec2(1180.0f, 980.0f));
+		TrainerToolWindow window(GetId().c_str(), "实体生成器", &m_WindowOpen, ImVec2(880.0f, 780.0f));
 		if (!window)
 			return;
 
@@ -40,8 +40,8 @@ namespace HRZ2::DebugUI
 		const float paneSpacing = ImGui::GetStyle().ItemSpacing.x;
 		const float listPaneWidth = std::clamp(
 			availableSize.x * 0.56f,
-			420.0f * uiScale,
-			availableSize.x - 380.0f * uiScale - paneSpacing);
+			360.0f * uiScale,
+			availableSize.x - 320.0f * uiScale - paneSpacing);
 		const float settingsPaneWidth = availableSize.x - listPaneWidth - paneSpacing;
 		const ImGuiWindowFlags paneFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
