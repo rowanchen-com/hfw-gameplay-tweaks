@@ -26,6 +26,7 @@ namespace InternalModConfig
 		float DebugMenuFontScale;
 		std::string DebugMenuFontPath;
 		float DebugMenuFontSize;
+		bool DebugMenuUseHardwareCursor;
 
 		// [Gameplay]
 		bool UnlockMapBoundaries;

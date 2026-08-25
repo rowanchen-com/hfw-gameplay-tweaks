@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <imgui.h>
 #include "../Core/IStreamingManager.h"
 #include "DebugUIWindow.h"
@@ -31,6 +32,7 @@ namespace HRZ2::DebugUI
 		InventoryItemSpawnCallback m_LoaderCallback;
 		GGUUID m_NextItemSpawnUUID;
 		uint32_t m_NextItemCount = 0;
+		std::atomic_bool m_StreamerRequestPending = false;
 
 		ImGuiTextFilter m_NameFilter;
 		bool m_FilterItemsInPlayerInventory = false;
@@ -39,6 +41,7 @@ namespace HRZ2::DebugUI
 	public:
 		virtual void Render() override;
 		virtual bool Close() override;
+		virtual void Reopen() override { m_WindowOpen = true; }
 		virtual std::string GetId() const override;
 
 	private:

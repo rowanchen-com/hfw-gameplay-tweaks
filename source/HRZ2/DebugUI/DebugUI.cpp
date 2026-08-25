@@ -1,3 +1,7 @@
+#include <cmath>
+#include <limits>
+#include <memory>
+#include <optional>
 #include <unordered_set>
 #include <Windows.h>
 #include <d3d12.h>
@@ -31,9 +35,21 @@ namespace HRZ2::DebugUI
 
 	ID3D12DescriptorHeap *SrvDescriptorHeap;
 	ID3D12DescriptorHeap *RtvDescriptorHeap;
+	ID3D12Fence *RenderFence;
+	HANDLE RenderFenceEvent;
+	std::vector<uint64_t> FrameFenceValues;
+	uint64_t NextFenceValue = 1;
+	UINT RtvDescriptorSize;
 
 	WNDPROC OriginalWndProc;
 	bool InterceptInput;
+	HCURSOR PreviousCursor;
+	HWND PreviousCaptureWindow;
+	POINT PreviousCursorPosition;
+	RECT PreviousCursorClip;
+	bool PreviousCursorPositionWasValid;
+	bool PreviousCursorClipWasActive;
+	int CursorVisibilityAdjustments;
 
 	LRESULT WINAPI WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
 
@@ -76,25 +92,106 @@ namespace HRZ2::DebugUI
 		return IO.Fonts->AddFontDefault();
 	}
 
-	void Initialize(NxDXGIImpl *DXGIImpl)
+	static bool CheckResult(HRESULT Result, const char *Operation)
+	{
+		if (SUCCEEDED(Result))
+			return true;
+
+		spdlog::error("{} failed with HRESULT 0x{:08X}.", Operation, static_cast<uint32_t>(Result));
+		return false;
+	}
+
+	static RECT GetVirtualScreenRect()
+	{
+		return {
+			.left = GetSystemMetrics(SM_XVIRTUALSCREEN),
+			.top = GetSystemMetrics(SM_YVIRTUALSCREEN),
+			.right = GetSystemMetrics(SM_XVIRTUALSCREEN) + GetSystemMetrics(SM_CXVIRTUALSCREEN),
+			.bottom = GetSystemMetrics(SM_YVIRTUALSCREEN) + GetSystemMetrics(SM_CYVIRTUALSCREEN),
+		};
+	}
+
+	static HCURSOR GetMenuCursor()
+	{
+		static const auto cursor = LoadCursorW(nullptr, IDC_ARROW);
+		return cursor;
+	}
+
+	static void SetHardwareCursorActive(bool Active)
+	{
+		if (!ModConfiguration.DebugMenuUseHardwareCursor)
+			return;
+
+		if (Active)
+		{
+			PreviousCursor = GetCursor();
+			PreviousCaptureWindow = GetCapture();
+			PreviousCursorPositionWasValid = GetCursorPos(&PreviousCursorPosition);
+			const auto virtualScreen = GetVirtualScreenRect();
+			PreviousCursorClipWasActive = GetClipCursor(&PreviousCursorClip) &&
+				!EqualRect(&PreviousCursorClip, &virtualScreen);
+
+			ClipCursor(nullptr);
+			ReleaseCapture();
+
+			CursorVisibilityAdjustments = 0;
+			int displayCount = 0;
+			do
+			{
+				displayCount = ShowCursor(TRUE);
+				CursorVisibilityAdjustments++;
+			} while (displayCount < 0);
+
+			SetCursor(GetMenuCursor());
+		}
+		else
+		{
+			for (int i = 0; i < CursorVisibilityAdjustments; i++)
+				ShowCursor(FALSE);
+
+			CursorVisibilityAdjustments = 0;
+
+			if (PreviousCursorPositionWasValid)
+				SetCursorPos(PreviousCursorPosition.x, PreviousCursorPosition.y);
+
+			if (PreviousCursorClipWasActive)
+				ClipCursor(&PreviousCursorClip);
+
+			if (PreviousCaptureWindow)
+				SetCapture(PreviousCaptureWindow);
+
+			SetCursor(PreviousCursor);
+			PreviousCursor = nullptr;
+			PreviousCaptureWindow = nullptr;
+			PreviousCursorPositionWasValid = false;
+			PreviousCursorClipWasActive = false;
+		}
+	}
+
+	bool Initialize(NxDXGIImpl *DXGIImpl)
 	{
 		// Steal the device and window handle from the swap chain
 		ID3D12Device *device = nullptr;
-		DXGIImpl->m_DXGISwapChain->GetDevice(IID_PPV_ARGS(&device));
+		if (!CheckResult(DXGIImpl->m_DXGISwapChain->GetDevice(IID_PPV_ARGS(&device)), "IDXGISwapChain::GetDevice"))
+			return false;
+		const std::unique_ptr<ID3D12Device, void (*)(ID3D12Device *)> deviceReference(device, [](ID3D12Device *Device)
+		{
+			Device->Release();
+		});
 
 		HWND windowHandle = nullptr;
-		DXGIImpl->m_DXGISwapChain->GetHwnd(&windowHandle);
+		if (!CheckResult(DXGIImpl->m_DXGISwapChain->GetHwnd(&windowHandle), "IDXGISwapChain::GetHwnd"))
+			return false;
 
 		// Grab back buffers and create d3d resources
-		auto hr = S_OK;
-
 		const D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 			.NumDescriptors = 16,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
 		};
 
-		hr |= device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&SrvDescriptorHeap));
+		if (!CheckResult(deviceReference->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&SrvDescriptorHeap)), "Create SRV descriptor heap"))
+			return false;
 
 		const D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
@@ -102,24 +199,52 @@ namespace HRZ2::DebugUI
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
 		};
 
-		hr |= device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&RtvDescriptorHeap));
+		if (!CheckResult(deviceReference->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&RtvDescriptorHeap)), "Create RTV descriptor heap"))
+			return false;
+
+		RtvDescriptorSize = deviceReference->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		CommandAllocators.resize(DXGIImpl->m_NumBuffers);
+		FrameFenceValues.resize(DXGIImpl->m_NumBuffers);
+
+		if (CommandAllocators.empty() || CommandAllocators.size() > rtvHeapDesc.NumDescriptors)
+		{
+			spdlog::error("Unsupported DXGI back-buffer count: {}.", CommandAllocators.size());
+			return false;
+		}
 
 		ID3D12Resource *tempBackBuffer = nullptr;
-		hr |= DXGIImpl->m_DXGISwapChain->GetBuffer(0, IID_PPV_ARGS(&tempBackBuffer));
+		if (!CheckResult(DXGIImpl->m_DXGISwapChain->GetBuffer(0, IID_PPV_ARGS(&tempBackBuffer)), "IDXGISwapChain::GetBuffer"))
+			return false;
+
 		auto backBufferDesc = tempBackBuffer->GetDesc();
 		tempBackBuffer->Release();
 
 		for (uint32_t i = 0; i < CommandAllocators.size(); i++)
-			hr |= device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&CommandAllocators[i]));
+		{
+			if (!CheckResult(
+					deviceReference->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&CommandAllocators[i])),
+					"Create D3D12 command allocator"))
+				return false;
+		}
 
-		hr |= device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocators[0], nullptr, IID_PPV_ARGS(&CommandList));
+		if (!CheckResult(
+				deviceReference->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocators[0], nullptr, IID_PPV_ARGS(&CommandList)),
+				"Create D3D12 command list"))
+			return false;
 
-		if (FAILED(hr))
-			__debugbreak();
+		if (!CheckResult(deviceReference->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&RenderFence)), "Create D3D12 render fence"))
+			return false;
 
-		CommandList->Close();
+		RenderFenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+		if (!RenderFenceEvent)
+		{
+			spdlog::error("CreateEventW failed for the D3D12 render fence.");
+			return false;
+		}
+
+		if (!CheckResult(CommandList->Close(), "Close initial D3D12 command list"))
+			return false;
 
 		// Initialize ImGui context
 		IMGUI_CHECKVERSION();
@@ -128,7 +253,24 @@ namespace HRZ2::DebugUI
 
 		auto& style = ImGui::GetStyle();
 		style.FrameBorderSize = 1;
-		style.ScrollbarRounding = 0;
+		style.WindowRounding = 3;
+		style.ChildRounding = 2;
+		style.FrameRounding = 2;
+		style.PopupRounding = 2;
+		style.ScrollbarRounding = 2;
+		style.GrabRounding = 2;
+		style.Colors[ImGuiCol_WindowBg] = ImVec4(0.025f, 0.045f, 0.060f, 0.96f);
+		style.Colors[ImGuiCol_PopupBg] = ImVec4(0.025f, 0.045f, 0.060f, 0.98f);
+		style.Colors[ImGuiCol_Border] = ImVec4(0.12f, 0.55f, 0.62f, 0.60f);
+		style.Colors[ImGuiCol_FrameBg] = ImVec4(0.06f, 0.11f, 0.14f, 0.96f);
+		style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.08f, 0.32f, 0.38f, 0.96f);
+		style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.08f, 0.43f, 0.50f, 1.00f);
+		style.Colors[ImGuiCol_Header] = ImVec4(0.08f, 0.35f, 0.42f, 0.90f);
+		style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.10f, 0.47f, 0.55f, 1.00f);
+		style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.12f, 0.58f, 0.66f, 1.00f);
+		style.Colors[ImGuiCol_Button] = ImVec4(0.08f, 0.33f, 0.39f, 0.90f);
+		style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.10f, 0.48f, 0.56f, 1.00f);
+		style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.12f, 0.60f, 0.68f, 1.00f);
 
 		auto& io = ImGui::GetIO();
 		io.FontDefault = LoadChineseFont(io);
@@ -136,31 +278,70 @@ namespace HRZ2::DebugUI
 		io.MouseDrawCursor = false;
 
 		// Create D3D12 resources
-		ImGui_ImplWin32_Init(windowHandle);
-		ImGui_ImplDX12_Init(
-			device,
+		if (!ImGui_ImplWin32_Init(windowHandle))
+		{
+			spdlog::error("ImGui Win32 backend initialization failed.");
+			return false;
+		}
+
+		if (!ImGui_ImplDX12_Init(
+			deviceReference.get(),
 			DXGIImpl->m_NumBuffers,
 			backBufferDesc.Format,
 			SrvDescriptorHeap,
 			SrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-			SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+			SrvDescriptorHeap->GetGPUDescriptorHandleForHeapStart()))
+		{
+			spdlog::error("ImGui D3D12 backend initialization failed.");
+			return false;
+		}
 
-		OriginalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrA(windowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&WndProc)));
-
+		SetLastError(ERROR_SUCCESS);
+		const auto previousWndProc = SetWindowLongPtrA(windowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&WndProc));
+		if (previousWndProc == 0 && GetLastError() != ERROR_SUCCESS)
+		{
+			spdlog::error("Failed to install the debug-menu window procedure (Win32 error {}).", GetLastError());
+			return false;
+		}
+		OriginalWndProc = reinterpret_cast<WNDPROC>(previousWndProc);
 		DebugUI::AddWindow(std::make_shared<MainMenuBar>());
+		return true;
 	}
 
 	void AddWindow(std::shared_ptr<Window> Handle)
 	{
-		// Immediately discard duplicate window instances
 		auto id = Handle->GetId();
+		auto existing = m_Windows.find(id);
 
-		if (!m_Windows.contains(id))
+		if (existing == m_Windows.end())
 			m_Windows.emplace(id, Handle);
+		else
+			existing->second->Reopen();
+	}
+
+	void SetMenuVisible(bool Visible)
+	{
+		if (MainMenuBar::m_IsVisible == Visible && InterceptInput == Visible)
+			return;
+
+		MainMenuBar::m_IsVisible = Visible;
+		InterceptInput = Visible;
+
+		auto& io = ImGui::GetIO();
+		io.MouseDrawCursor = Visible && !ModConfiguration.DebugMenuUseHardwareCursor;
+		SetHardwareCursorActive(Visible);
 	}
 
 	void RenderUI()
 	{
+		if (InterceptInput && ModConfiguration.DebugMenuUseHardwareCursor)
+		{
+			// Frame-generation inserts images that never execute this DLL. Let the Windows compositor
+			// draw the pointer independently, and undo any cursor clipping restored by the game.
+			ClipCursor(nullptr);
+			SetCursor(GetMenuCursor());
+		}
+
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -175,12 +356,13 @@ namespace HRZ2::DebugUI
 		// A copy is required because Render() might create new instances and invalidate iterators
 		auto currentWindows = m_Windows;
 
-		for (auto& [name, window] : currentWindows)
+		for (auto& entry : currentWindows)
 		{
-			// Detach windows that are pending close first
-			if (window->Close())
-				m_Windows.erase(name);
-			else
+			auto& window = entry.second;
+
+			// Keep window instances alive after they are closed. Streaming callbacks registered by
+			// inventory, weather, and entity windows retain their userdata pointer asynchronously.
+			if (!window->Close())
 				window->Render();
 		}
 
@@ -194,15 +376,36 @@ namespace HRZ2::DebugUI
 		if (drawData->Valid && drawData->CmdListsCount > 0)
 		{
 			const auto bufferIndex = DXGIImpl->m_DXGISwapChain->GetCurrentBackBufferIndex();
+			if (bufferIndex >= CommandAllocators.size())
+			{
+				spdlog::error("DXGI returned an invalid back-buffer index: {}.", bufferIndex);
+				return;
+			}
+
+			const auto pendingFenceValue = FrameFenceValues[bufferIndex];
+			if (pendingFenceValue != 0 && RenderFence->GetCompletedValue() < pendingFenceValue)
+			{
+				if (!CheckResult(RenderFence->SetEventOnCompletion(pendingFenceValue, RenderFenceEvent), "Wait for D3D12 render fence"))
+					return;
+
+				if (WaitForSingleObject(RenderFenceEvent, 5000) != WAIT_OBJECT_0)
+				{
+					spdlog::error("Timed out waiting for the D3D12 UI command allocator.");
+					return;
+				}
+			}
+
 			const auto buffer = D3DImpl->GetD3D12GameBackBuffer(bufferIndex);
 
 			// Create a brand new RTV each frame. Tracking this in engine code is too difficult.
-			const auto rtvHandle = RtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+			auto rtvHandle = RtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+			rtvHandle.ptr += static_cast<SIZE_T>(bufferIndex) * RtvDescriptorSize;
 			D3DImpl->GetD3D12Device()->CreateRenderTargetView(buffer, nullptr, rtvHandle);
 
 			// Reset command allocator, command list, then draw
 			auto allocator = CommandAllocators[bufferIndex];
-			allocator->Reset();
+			if (!CheckResult(allocator->Reset(), "Reset D3D12 command allocator"))
+				return;
 
 			D3D12_RESOURCE_BARRIER barrier = {
 				.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
@@ -215,7 +418,8 @@ namespace HRZ2::DebugUI
 				},
 			};
 
-			CommandList->Reset(allocator, nullptr);
+			if (!CheckResult(CommandList->Reset(allocator, nullptr), "Reset D3D12 command list"))
+				return;
 			CommandList->ResourceBarrier(1, &barrier);
 
 			CommandList->SetDescriptorHeaps(1, &SrvDescriptorHeap);
@@ -224,9 +428,21 @@ namespace HRZ2::DebugUI
 
 			std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
 			CommandList->ResourceBarrier(1, &barrier);
-			CommandList->Close();
+			if (!CheckResult(CommandList->Close(), "Close D3D12 UI command list"))
+				return;
 
-			D3DImpl->GetD3D12CommandQueue(0)->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList *const *>(&CommandList));
+			auto queue = D3DImpl->GetD3D12CommandQueue(0);
+			if (!queue)
+			{
+				spdlog::error("The D3D12 direct command queue is unavailable.");
+				return;
+			}
+
+			queue->ExecuteCommandLists(1, reinterpret_cast<ID3D12CommandList *const *>(&CommandList));
+
+			const auto submittedFenceValue = NextFenceValue++;
+			if (CheckResult(queue->Signal(RenderFence, submittedFenceValue), "Signal D3D12 render fence"))
+				FrameFenceValues[bufferIndex] = submittedFenceValue;
 		}
 	}
 
@@ -239,13 +455,29 @@ namespace HRZ2::DebugUI
 			if (ModConfiguration.Hotkeys.ToggleDebugUI == VK_OEM_3 && wParam == VK_OEM_8)
 				wParam = VK_OEM_3; // Workaround for UK keyboard layouts
 
+			const bool isModHotkey =
+				wParam == ModConfiguration.Hotkeys.ToggleDebugUI ||
+				wParam == ModConfiguration.Hotkeys.TogglePauseGameLogic ||
+				wParam == ModConfiguration.Hotkeys.ToggleAIProcessing ||
+				wParam == ModConfiguration.Hotkeys.TogglePauseTimeOfDay ||
+				wParam == ModConfiguration.Hotkeys.ToggleFreeCamera ||
+				wParam == ModConfiguration.Hotkeys.ToggleNoclip ||
+				wParam == ModConfiguration.Hotkeys.IncreaseTimescale ||
+				wParam == ModConfiguration.Hotkeys.DecreaseTimescale ||
+				wParam == ModConfiguration.Hotkeys.ToggleTimescale ||
+				wParam == ModConfiguration.Hotkeys.SpawnEntity ||
+				wParam == ModConfiguration.Hotkeys.QuickSave ||
+				wParam == ModConfiguration.Hotkeys.QuickLoad;
+
+			// A held key generates repeated WM_KEYDOWN messages. Consume repeats for mod hotkeys
+			// so toggles cannot oscillate and one-shot actions cannot run more than once per press.
+			if (isModHotkey && (lParam & (1LL << 30)) != 0)
+				return 1;
+
 			if (wParam == ModConfiguration.Hotkeys.ToggleDebugUI)
 			{
-				// Toggle input blocking and the main menu bar
+				// Toggle input blocking and the trainer menu as one state transition.
 				MainMenuBar::ToggleVisibility();
-
-				InterceptInput = !InterceptInput;
-				ImGui::GetIO().MouseDrawCursor = InterceptInput;
 
 				return 1;
 			}
@@ -310,6 +542,12 @@ namespace HRZ2::DebugUI
 
 		// Allow imgui to process it
 		ImGui_ImplWin32_WndProcHandler(hWnd, Msg, wParam, lParam);
+
+		if (InterceptInput && ModConfiguration.DebugMenuUseHardwareCursor && Msg == WM_SETCURSOR)
+		{
+			SetCursor(GetMenuCursor());
+			return TRUE;
+		}
 
 		if (ShouldInterceptInput())
 		{
@@ -450,25 +688,25 @@ namespace HRZ2::DebugUI
 		// Scale camera velocity based on delta time
 		float baseSpeed = io.DeltaTime * 5.0f;
 
-		if (io.KeysDown[ImGuiKey_LeftShift])
+		if (ImGui::IsKeyDown(ImGuiKey_LeftShift))
 			baseSpeed *= 10.0f;
-		else if (io.KeysDown[ImGuiKey_LeftCtrl])
+		else if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl))
 			baseSpeed /= 5.0f;
 
 		// WSAD keys for movement
 		float forwardSpeed = 0.0f;
 		float strafeSpeed = 0.0f;
 
-		if (io.KeysDown[ImGuiKey_W])
+		if (ImGui::IsKeyDown(ImGuiKey_W))
 			forwardSpeed += baseSpeed;
 
-		if (io.KeysDown[ImGuiKey_S])
+		if (ImGui::IsKeyDown(ImGuiKey_S))
 			forwardSpeed -= baseSpeed;
 
-		if (io.KeysDown[ImGuiKey_A])
+		if (ImGui::IsKeyDown(ImGuiKey_A))
 			strafeSpeed -= baseSpeed;
 
-		if (io.KeysDown[ImGuiKey_D])
+		if (ImGui::IsKeyDown(ImGuiKey_D))
 			strafeSpeed += baseSpeed;
 
 		JobHeaderCPU::SubmitCallable([forwardSpeed, strafeSpeed, adjustYaw, adjustPitch]
@@ -490,7 +728,7 @@ namespace HRZ2::DebugUI
 
 				camera->SetWorldTransform(cameraTransform);
 			}
-			else if (cameraMode == MainMenuBar::FreeCamMode::Noclip && player->m_Entity)
+			else if (cameraMode == MainMenuBar::FreeCamMode::Noclip && player->m_Entity && player->m_Entity->m_Mover)
 			{
 				cameraTransform.Orientation = camera->GetWorldTransform().Orientation;
 				cameraTransform.Position += cameraTransform.Orientation.Forward() * forwardSpeed;

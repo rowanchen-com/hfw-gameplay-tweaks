@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <optional>
 #include <imgui.h>
 #include "../Core/IStreamingManager.h"
 #include "../Core/WorldTransform.h"
@@ -28,10 +30,11 @@ namespace HRZ2::DebugUI
 		uint32_t m_OutstandingSpawnCount = 0;
 		WorldTransform m_NextSpawnTransform;
 		size_t m_NextSpawnSelectedIndex = 0;
-		RTTIRefObject *m_NextFaction = nullptr;
+		Ref<RTTIRefObject> m_NextFaction;
 
 		SharedMutex m_FactionSetupMutex;
-		std::vector<std::pair<Ref<RTTIRefObject>, RTTIRefObject *>> m_FactionSetsPending;
+		std::vector<std::pair<Ref<RTTIRefObject>, Ref<RTTIRefObject>>> m_FactionSetsPending;
+		std::atomic_bool m_FactionUpdateJobPending = false;
 
 		EntitySpawnerLoaderCallback m_LoaderCallback;
 		bool m_StreamerRequestPending = false;
@@ -43,12 +46,13 @@ namespace HRZ2::DebugUI
 	public:
 		virtual void Render() override;
 		virtual bool Close() override;
+		virtual void Reopen() override { m_WindowOpen = true; }
 		virtual std::string GetId() const override;
 
 		static void ForceSpawnEntityClick();
 
 	private:
 		void RunSpawnCommands();
-		WorldTransform GetSpawnTransform(uint32_t Type, const WorldPosition& CustomPosition);
+		std::optional<WorldTransform> GetSpawnTransform(uint32_t Type, const WorldPosition& CustomPosition);
 	};
 }

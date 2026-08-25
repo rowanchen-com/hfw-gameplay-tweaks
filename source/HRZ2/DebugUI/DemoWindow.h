@@ -12,6 +12,7 @@ namespace HRZ2::DebugUI
 	public:
 		virtual void Render() override;
 		virtual bool Close() override;
+		virtual void Reopen() override { m_WindowOpen = true; }
 		virtual std::string GetId() const override;
 	};
 }

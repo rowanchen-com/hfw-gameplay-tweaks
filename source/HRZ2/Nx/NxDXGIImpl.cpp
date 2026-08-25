@@ -13,8 +13,7 @@ namespace HRZ2
 			if (!ModConfiguration.EnableDebugMenu)
 				return false;
 
-			DebugUI::Initialize(Thisptr);
-			return true;
+			return DebugUI::Initialize(Thisptr);
 		}();
 
 		if (uiInitialized)

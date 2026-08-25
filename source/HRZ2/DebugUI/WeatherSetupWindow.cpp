@@ -20,6 +20,7 @@ namespace HRZ2::DebugUI
 
 		std::shared_lock lock(ModCoreEvents::GetInstance().m_CachedDataMutex);
 		TrySetOverride(targetUUID);
+		static_cast<WeatherSetupWindow *>(Userdata)->m_StreamerRequestPending.store(false);
 	}
 
 	void WeatherSetupLoaderCallback::OnUnloaded(RTTIRefObject *Object, void *Userdata) {}
@@ -34,11 +35,14 @@ namespace HRZ2::DebugUI
 			JobHeaderCPU::SubmitCallable(
 				[p = Ref(setup)]()
 				{
-					if (auto weatherSystem = GameModule::GetInstance()->m_WeatherSystem)
-						weatherSystem->SetWeatherOverride(
-							reinterpret_cast<WeatherSetup *>(p.GetPtr()),
-							1.0f,
-							EWeatherOverrideType::NODEGRAPH_WEATHER_OVERRIDE);
+					if (auto module = GameModule::GetInstance())
+					{
+						if (auto weatherSystem = module->m_WeatherSystem)
+							weatherSystem->SetWeatherOverride(
+								reinterpret_cast<WeatherSetup *>(p.GetPtr()),
+								1.0f,
+								EWeatherOverrideType::NODEGRAPH_WEATHER_OVERRIDE);
+					}
 				});
 
 			return true;
@@ -89,28 +93,43 @@ namespace HRZ2::DebugUI
 			ImGui::EndListBox();
 		}
 
-		const bool setIsAllowed = m_LastSelectedIndex < ModConfiguration.CachedWeatherSetups.size();
+		const bool setIsAllowed = m_LastSelectedIndex < ModConfiguration.CachedWeatherSetups.size() &&
+			!m_StreamerRequestPending.load();
 		ImGui::BeginDisabled(!setIsAllowed);
 
 		if ((ImGui::Button("应用###Set") || m_DoSetOnNextFrame) && setIsAllowed)
 		{
-			m_NextWeatherSetupUUID = ModConfiguration.CachedWeatherSetups[m_LastSelectedIndex].UUID;
+			const auto targetSetupUUID = ModConfiguration.CachedWeatherSetups[m_LastSelectedIndex].UUID;
 
 			// Skip the RootUUID dance when the setup is already loaded
 			const bool setupWasAlreadyLoaded = [&]()
 			{
 				std::shared_lock lock(ModCoreEvents::GetInstance().m_CachedDataMutex);
-				return m_LoaderCallback.TrySetOverride(m_NextWeatherSetupUUID);
+				return m_LoaderCallback.TrySetOverride(targetSetupUUID);
 			}();
 
 			if (!setupWasAlreadyLoaded)
 			{
-				auto streamingManager = StreamingManager::GetInstance();
-
-				g_TargetRef.Clear();
-				streamingManager->Register2(g_TargetRef, {}, ModConfiguration.CachedWeatherSetups[m_LastSelectedIndex].RootUUID);
-				streamingManager->RegisterCallback(g_TargetRef, EStreamingRefCallbackMode::OnLoad, &m_LoaderCallback, this);
-				streamingManager->Resolve(g_TargetRef, EStreamingRefPriority::Normal);
+				if (m_StreamerRequestPending.exchange(true))
+				{
+					spdlog::warn("Ignored a weather request because another setup is still streaming.");
+				}
+				else
+				{
+					m_NextWeatherSetupUUID = targetSetupUUID;
+					auto streamingManager = StreamingManager::GetInstance();
+					if (streamingManager)
+					{
+						g_TargetRef.Clear();
+						streamingManager->Register2(g_TargetRef, {}, ModConfiguration.CachedWeatherSetups[m_LastSelectedIndex].RootUUID);
+						streamingManager->RegisterCallback(g_TargetRef, EStreamingRefCallbackMode::OnLoad, &m_LoaderCallback, this);
+						streamingManager->Resolve(g_TargetRef, EStreamingRefPriority::Normal);
+					}
+					else
+					{
+						m_StreamerRequestPending.store(false);
+					}
+				}
 			}
 		}
 

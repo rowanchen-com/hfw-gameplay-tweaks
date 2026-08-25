@@ -8,6 +8,15 @@ Source code for the Horizon Forbidden West mod, with a complete Simplified Chine
 - Loads a CJK-capable font so Chinese text renders correctly in Dear ImGui.
 - Includes localized `mod_config.ini` and `mod_DamageSettings.ini` resources without changing the original cheat defaults.
 - Uses `C:/Windows/Fonts/msyh.ttc` by default. `DebugMenuFontPath` and `DebugMenuFontSize` can be changed under `[General]`.
+- Replaces the narrow menu bar with a GTA-style interaction menu using hierarchical pages, keyboard navigation, mouse support, descriptions, and page counters.
+- Uses the Windows hardware cursor by default so the pointer remains smooth when frame generation is enabled. Set `DebugMenuUseHardwareCursor = false` to restore Dear ImGui's software cursor.
+
+## Menu controls
+
+- Press the configured debug-menu hotkey (backtick/tilde by default) to open or close the menu.
+- Use the arrow keys or `WASD` to select and adjust options.
+- Press `Enter` to activate an option, `Backspace` or `Escape` to return, or use the mouse.
+- The internal player-faction identifiers intentionally remain in English because they are game resource names rather than display text.
 
 ## Installation
 

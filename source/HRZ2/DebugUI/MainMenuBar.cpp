@@ -1,4 +1,10 @@
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <format>
+#include <limits>
+#include <shared_mutex>
+#include <utility>
 #include <imgui.h>
 #include <Windows.h>
 #include "../../ModConfiguration.h"
@@ -21,12 +27,52 @@
 #include "PlayerInventoryWindow.h"
 #include "WeatherSetupWindow.h"
 
+namespace
+{
+	struct TeleportEntry
+	{
+		const char *Name;
+		HRZ2::WorldPosition Position;
+	};
+
+	const std::array TeleportLocations = {
+		TeleportEntry { "HZD - 子午城入口", { 3918.612, 5465.897, 830.652 } },
+		TeleportEntry { "HZD - 尖塔", { 4162.499, 4757.230, 774.453 } },
+		TeleportEntry { "HZD - 庄园", { 4082.374, 4614.900, 710.106 } },
+		TeleportEntry { "HZD - 门地", { 4695.546, 5482.825, 787.018 } },
+		TeleportEntry { "HZD - 孤光", { 4772.899, 5777.062, 780.938 } },
+		TeleportEntry { "HZD - 炽焰拱门", { 3086.388, 5931.355, 813.258 } },
+		TeleportEntry { "HZD - 炼铸厂 ZETA", { 4050.798, 6724.117, 840.551 } },
+		TeleportEntry { "HZD - 日落之地竞技场", { 3009.000, 6565.725, 868.025 } },
+		TeleportEntry { "HZD - 造者末途", { 3435.481, 7210.677, 825.362 } },
+		TeleportEntry { "HZD - 丹特", { 1662.439, 5811.224, 794.055 } },
+		TeleportEntry { "HZD - 耀光峡谷", { 5260.463, 6411.703, 820.775 } },
+		TeleportEntry { "HFW - 开场过场动画 1", { 5737.400, -2394.600, 432.400 } },
+		TeleportEntry { "HFW - 开场过场动画 2", { 6315.800, -1698.400, 320.100 } },
+		TeleportEntry { "HFW - 开场过场动画 3", { 6942.200, -1713.900, 321.000 } },
+		TeleportEntry { "HFW - 开场过场动画 4（树之梦）", { 2691.584, -3752.680, 477.490 } },
+		TeleportEntry { "HFW - 序章教学区域", { 5645.362, -2886.453, 403.551 } },
+		TeleportEntry { "HFW - 序章法尔·泽尼斯设施", { 5993.999, -2915.253, 334.978 } },
+		TeleportEntry { "HFW - 序章法尔·泽尼斯航天飞机", { 6465.844, -3147.694, 331.482 } },
+		TeleportEntry { "HFW - 贫瘠之光山地要塞", { 2690.644, 441.522, 677.341 } },
+		TeleportEntry { "HFW - 炙炎海岸首领战区域", { -140.415, -4405.686, 291.182 } },
+		TeleportEntry { "HFW - 炙炎海岸未完成区域", { 2107.752, -6777.761, 302.759 } },
+		TeleportEntry { "HFW - 顶级猎杀：西浅滩", { -4531.792, -460.949, 185.629 } },
+		TeleportEntry { "HFW - 顶级猎杀：灰峰", { -1452.500, -614.100, 520.100 } },
+		TeleportEntry { "HFW - 法尔·泽尼斯基地", { -1417.900, -3088.700, 283.900 } },
+	};
+
+	bool IsNavigationKeyPressed(ImGuiKey Primary, ImGuiKey Alternate)
+	{
+		return ImGui::IsKeyPressed(Primary) || ImGui::IsKeyPressed(Alternate);
+	}
+}
+
 namespace HRZ2::DebugUI
 {
 	MainMenuBar::MainMenuBar()
 	{
 		m_LODRangeModifier = ModCoreEvents::GetInstance().m_CachedLODRangeModifierHack;
-
 		m_EnableGodMode = ModConfiguration.EnableGodMode;
 		m_EnableInfiniteClipAmmo = ModConfiguration.EnableInfiniteClipAmmo;
 		m_EnableAutoNeutralFaction = ModConfiguration.EnableAutoNeutralFaction;
@@ -34,41 +80,25 @@ namespace HRZ2::DebugUI
 
 	void MainMenuBar::Render()
 	{
-		if (!m_IsVisible || !ImGui::BeginMainMenuBar())
+		if (!m_IsVisible)
 			return;
 
-		// Empty space for MSI afterburner display
-		ImGui::BeginMenu("                        ", false);
+		auto items = BuildMenuItems();
+		if (items.empty())
+			items.emplace_back(MenuItem { .Label = "暂无可用选项", .Description = "当前游戏状态下没有可用功能。", .Enabled = false });
 
-		// Gameplay menu
-		if (ImGui::BeginMenu("游戏###Gameplay"))
+		const bool stateChanged = HandleMenuInput(items);
+		if (!m_IsVisible)
+			return;
+
+		if (stateChanged)
 		{
-			DrawGameplayMenu();
-			ImGui::EndMenu();
+			items = BuildMenuItems();
+			if (items.empty())
+				items.emplace_back(MenuItem { .Label = "暂无可用选项", .Description = "当前游戏状态下没有可用功能。", .Enabled = false });
 		}
 
-		// Cheats menu
-		if (ImGui::BeginMenu("作弊###Cheats", Player::GetLocalPlayer() != nullptr))
-		{
-			DrawCheatsMenu();
-			ImGui::EndMenu();
-		}
-
-		// Miscellaneous menu
-		if (ImGui::BeginMenu("其他###Miscellaneous"))
-		{
-			DrawMiscellaneousMenu();
-			ImGui::EndMenu();
-		}
-
-		// Credits
-		XorStr creditsBuf("游戏键盘输入已屏蔽 | HFW 游戏调整与作弊菜单，作者：Nukem\0");
-		auto credits = creditsBuf.Decrypt();
-
-		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(credits.data()).x);
-		ImGui::BeginMenu(credits.data(), false);
-
-		ImGui::EndMainMenuBar();
+		DrawTrainerFrame(items);
 	}
 
 	bool MainMenuBar::Close()
@@ -78,377 +108,581 @@ namespace HRZ2::DebugUI
 
 	std::string MainMenuBar::GetId() const
 	{
-		return "Main Menu Bar";
+		return "HFW Trainer Menu";
 	}
 
-	void MainMenuBar::DrawGameplayMenu()
+	std::vector<MainMenuBar::MenuItem> MainMenuBar::BuildMenuItems()
 	{
-		ImGui::MenuItem("暂停游戏逻辑###PauseGameLogic", nullptr, &m_PauseGame);
-		if (ImGui::MenuItem("暂停 AI 处理###PauseAIProcessing", nullptr, m_PauseAIProcessing))
-			TogglePauseAIProcessing();
-		ImGui::MenuItem("##sep1", nullptr, nullptr, false);
+		std::vector<MenuItem> items;
 
-		if (ImGui::MenuItem("强制快速保存###ForceQuickSave"))
-			ToggleQuickSave();
-
-		if (ImGui::MenuItem("强制读取上一存档###ForceLoadPreviousSave"))
-			ToggleQuickLoad();
-
-		// Day/night cycle
-		if (auto gameModule = GameModule::GetInstance())
+		auto addAction = [&](std::string Label, std::string Description, std::function<void()> Callback, bool Enabled = true)
 		{
-			if (auto worldTimeState = gameModule->m_WorldTimeState)
-			{
-				ImGui::MenuItem("##sep2", nullptr, nullptr, false);
-
-				if (ImGui::MenuItem("暂停昼夜时间###PauseTimeOfDay", nullptr, worldTimeState->m_IsPaused))
-					TogglePauseTimeOfDay();
-
-				if (ImGui::MenuItem("暂停昼夜循环###PauseDayNightCycle", nullptr, !worldTimeState->m_EnableDayNightCycle))
-					worldTimeState->m_EnableDayNightCycle = !worldTimeState->m_EnableDayNightCycle;
-
-				ImGui::MenuItem("当前时间###TimeOfDay", nullptr, nullptr, false);
-				float timeOfDay = worldTimeState->m_TimeOfDay;
-
-				if (ImGui::SliderFloat("##timeofdaybar", &timeOfDay, 0.0f, 23.9999f))
-					worldTimeState->SetTimeOfDay(timeOfDay, 0.0f);
-			}
-		}
-
-		// Timescale
-		ImGui::MenuItem("##sep3", nullptr, nullptr, false);
-		ImGui::MenuItem("在菜单中也启用时间倍率覆盖###TimescaleOverrideInMenus", nullptr, &m_TimescaleOverrideInMenus);
-		if (ImGui::MenuItem("启用时间倍率覆盖###EnableTimescaleOverride", nullptr, m_TimescaleOverride))
-			ToggleTimescaleOverride();
-		ImGui::MenuItem("时间倍率###Timescale", nullptr, nullptr, false);
-
-		auto modifyTimescale = [](float Scale, bool SameLine = true)
-		{
-			char temp[64];
-			sprintf_s(temp, "%g##setTs%g", Scale, Scale);
-
-			if (ImGui::Button(temp))
-				AdjustTimescale(Scale - m_Timescale);
-
-			if (SameLine)
-				ImGui::SameLine();
+			items.emplace_back(MenuItem {
+				.Label = std::move(Label), .Value = "执行", .Description = std::move(Description),
+				.Enabled = Enabled, .Activate = std::move(Callback),
+			});
 		};
 
-		if (float f = m_Timescale; ImGui::SliderFloat("##TimescaleDragFloat", &f, 0.001f, 10.0f))
-			AdjustTimescale(f - m_Timescale);
+		auto addSubmenu = [&](std::string Label, std::string Description, Page Target, bool Enabled = true)
+		{
+			items.emplace_back(MenuItem {
+				.Label = std::move(Label), .Value = ">", .Description = std::move(Description),
+				.Enabled = Enabled, .IsSubmenu = true, .Activate = [this, Target]() { OpenPage(Target); },
+			});
+		};
 
-		modifyTimescale(0.01f);
-		modifyTimescale(0.25f);
-		modifyTimescale(0.5f);
-		modifyTimescale(1.0f);
-		modifyTimescale(2.0f);
-		modifyTimescale(5.0f);
-		modifyTimescale(10.0f, false);
+		auto addToggle = [&items](std::string Label, std::string Description, bool CurrentValue,
+			std::function<void(bool)> Setter, bool Enabled = true)
+		{
+			items.emplace_back(MenuItem {
+				.Label = std::move(Label), .Value = CurrentValue ? "开启" : "关闭", .Description = std::move(Description),
+				.Enabled = Enabled,
+				.Activate = [CurrentValue, Setter]() { Setter(!CurrentValue); },
+				.AdjustLeft = [Setter]() { Setter(false); }, .AdjustRight = [Setter]() { Setter(true); },
+			});
+		};
+
+		auto addValue = [&items](std::string Label, std::string Value, std::string Description,
+			std::function<void()> AdjustLeft, std::function<void()> AdjustRight, bool Enabled = true)
+		{
+			items.emplace_back(MenuItem {
+				.Label = std::move(Label), .Value = std::move(Value), .Description = std::move(Description),
+				.Enabled = Enabled, .AdjustLeft = std::move(AdjustLeft), .AdjustRight = std::move(AdjustRight),
+			});
+		};
+
+		const auto currentPage = m_Navigation.back().PageId;
+		auto player = Player::GetLocalPlayer();
+		const bool playerAvailable = player && player->m_Entity;
+
+		switch (currentPage)
+		{
+		case Page::Home:
+			addSubmenu("玩家选项", "无敌、弹药、自由镜头、穿墙和玩家状态。", Page::Player, playerAvailable);
+			addSubmenu("世界与时间", "控制游戏暂停、昼夜时间、时间倍率和显示距离。", Page::World);
+			addSubmenu("传送", "将玩家传送到预设坐标或自由镜头位置。", Page::Teleport, playerAvailable);
+			addSubmenu("玩家阵营", "切换玩家使用的游戏内部 AI 阵营。", Page::Faction, playerAvailable);
+			addAction("玩家物品栏", "打开物品管理窗口；操作任务物品前请先备份存档。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
+			addAction("实体生成器", "打开实体生成窗口，可生成机器、动物和其他实体。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
+			addAction("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
+			addSubmenu("实用工具", "保存、读取和菜单控制。", Page::Utilities);
+			addSubmenu("开发者工具", "日志、RTTI 导出和调试功能。", Page::Developer);
+			break;
+
+		case Page::Player:
+		{
+			auto debugSettings = DebugSettings::GetInstance();
+			const bool debugAvailable = debugSettings != nullptr;
+
+			addToggle("穿墙模式", "让埃洛伊脱离碰撞并使用自由移动。", m_FreeCamMode == FreeCamMode::Noclip, [](bool Enabled)
+			{
+				if ((m_FreeCamMode == FreeCamMode::Noclip) != Enabled) ToggleNoclip();
+			}, playerAvailable);
+			addToggle("自由镜头", "让镜头脱离玩家移动；按住鼠标右键旋转。", m_FreeCamMode == FreeCamMode::Free, [](bool Enabled)
+			{
+				if ((m_FreeCamMode == FreeCamMode::Free) != Enabled) ToggleFreeflyCamera();
+			}, playerAvailable);
+			addToggle("无敌模式", "免疫伤害，同时保留正常生命值逻辑。", m_EnableGodMode, [](bool Enabled)
+			{
+				if (auto p = Player::GetLocalPlayer(); p && p->m_Entity && p->m_Entity->m_Destructibility)
+				{
+					auto d = p->m_Entity->m_Destructibility;
+					m_EnableGodMode = Enabled;
+					if (Enabled) m_EnableDemigodMode = false;
+					d->m_Invulnerable = Enabled;
+					d->m_DieAtZeroHealth = true;
+				}
+			}, playerAvailable);
+			addToggle("半无敌模式", "仍会受到伤害，但生命值降至零时不会死亡。", m_EnableDemigodMode, [](bool Enabled)
+			{
+				if (auto p = Player::GetLocalPlayer(); p && p->m_Entity && p->m_Entity->m_Destructibility)
+				{
+					auto d = p->m_Entity->m_Destructibility;
+					m_EnableDemigodMode = Enabled;
+					if (Enabled) m_EnableGodMode = false;
+					d->m_Invulnerable = false;
+					d->m_DieAtZeroHealth = !Enabled;
+				}
+			}, playerAvailable);
+			addToggle("无限备用弹药", "射击时不消耗物品栏中的备用弹药。", debugAvailable && debugSettings->m_InfiniteAmmo, [](bool Enabled)
+			{
+				if (auto s = DebugSettings::GetInstance())
+				{
+					s->m_InfiniteAmmo = Enabled;
+					if (Enabled) { s->m_InfiniteSizeClip = false; m_EnableInfiniteClipAmmo = false; }
+				}
+			}, debugAvailable);
+			addToggle("无限弹匣弹药", "当前武器无需重新装填，并与无限备用弹药互斥。", m_EnableInfiniteClipAmmo, [](bool Enabled)
+			{
+				if (auto s = DebugSettings::GetInstance())
+				{
+					m_EnableInfiniteClipAmmo = Enabled;
+					s->m_InfiniteSizeClip = Enabled;
+					if (Enabled) s->m_InfiniteAmmo = false;
+				}
+			}, debugAvailable);
+			addToggle("无限武器耐力", "武器相关耐力不会耗尽。", debugAvailable && debugSettings->m_Inexhaustible, [](bool Enabled)
+			{
+				if (auto s = DebugSettings::GetInstance()) s->m_Inexhaustible = Enabled;
+			}, debugAvailable);
+			addToggle("自动中立阵营", "持续将玩家阵营设置为中立；手动选阵营会关闭此项。", m_EnableAutoNeutralFaction,
+				[](bool Enabled) { m_EnableAutoNeutralFaction = Enabled; }, playerAvailable);
+			addToggle("模拟游戏已完成", "解锁依赖通关状态的调试内容。", debugAvailable && debugSettings->m_SPAllUnlocked, [](bool Enabled)
+			{
+				if (auto s = DebugSettings::GetInstance()) s->m_SPAllUnlocked = Enabled;
+			}, debugAvailable);
+			addToggle("游戏中应用拍照模式设置", "无需进入拍照模式即可应用部分拍照参数。",
+				debugAvailable && debugSettings->m_ApplyPhotoModeSettingsIngame, [](bool Enabled)
+			{
+				if (auto s = DebugSettings::GetInstance()) s->m_ApplyPhotoModeSettingsIngame = Enabled;
+			}, debugAvailable);
+			break;
+		}
+
+		case Page::World:
+		{
+			addToggle("暂停游戏逻辑", "暂停大部分游戏世界更新。", m_PauseGame, [](bool Enabled) { m_PauseGame = Enabled; });
+			addToggle("暂停 AI 处理", "暂停敌人与其他 AI 的更新。", m_PauseAIProcessing, [](bool Enabled) { m_PauseAIProcessing = Enabled; });
+
+			auto module = GameModule::GetInstance();
+			auto time = module ? module->m_WorldTimeState : nullptr;
+			const bool timeAvailable = time != nullptr;
+			addToggle("暂停昼夜时间", "冻结当前时刻。", timeAvailable && time->m_IsPaused, [](bool Enabled)
+			{
+				JobHeaderCPU::SubmitCallable([Enabled]()
+				{
+					if (auto m = GameModule::GetInstance(); m && m->m_WorldTimeState) m->m_WorldTimeState->m_IsPaused = Enabled;
+				});
+			}, timeAvailable);
+			addToggle("启用昼夜循环", "允许游戏时间正常推进。", timeAvailable && time->m_EnableDayNightCycle, [](bool Enabled)
+			{
+				if (auto m = GameModule::GetInstance(); m && m->m_WorldTimeState) m->m_WorldTimeState->m_EnableDayNightCycle = Enabled;
+			}, timeAvailable);
+			addValue("当前时间", timeAvailable ? std::format("{:.1f} 时", time->m_TimeOfDay) : "不可用",
+				"使用左右键以半小时为单位调整昼夜时间。", []()
+			{
+				if (auto m = GameModule::GetInstance(); m && m->m_WorldTimeState)
+				{
+					auto value = m->m_WorldTimeState->m_TimeOfDay - 0.5f;
+					if (value < 0.0f) value += 24.0f;
+					m->m_WorldTimeState->SetTimeOfDay(value, 0.0f);
+				}
+			}, []()
+			{
+				if (auto m = GameModule::GetInstance(); m && m->m_WorldTimeState)
+				{
+					auto value = std::fmod(m->m_WorldTimeState->m_TimeOfDay + 0.5f, 24.0f);
+					m->m_WorldTimeState->SetTimeOfDay(value, 0.0f);
+				}
+			}, timeAvailable);
+			addToggle("时间倍率覆盖", "使用自定义倍率覆盖正常游戏速度。", m_TimescaleOverride,
+				[](bool Enabled) { m_TimescaleOverride = Enabled; });
+			addToggle("菜单内保持时间倍率", "打开游戏内菜单时仍应用自定义时间倍率。", m_TimescaleOverrideInMenus,
+				[](bool Enabled) { m_TimescaleOverrideInMenus = Enabled; });
+			addValue("时间倍率", std::format("{:.2f}x", m_Timescale), "左右键调整；确认键恢复 1.00x。",
+				[]() { AdjustTimescale(-0.25f); }, []() { AdjustTimescale(0.25f); });
+			items.back().Activate = []() { m_Timescale = 1.0f; m_TimescaleOverride = true; };
+
+			const bool lodEnabled = m_LODRangeModifier != std::numeric_limits<float>::max();
+			addToggle("LOD 偏差覆盖", "覆盖游戏视图的细节层级距离倍率。", lodEnabled, [](bool Enabled)
+			{
+				m_LODRangeModifier = Enabled ? 1.0f : std::numeric_limits<float>::max();
+			});
+			addValue("LOD 偏差", lodEnabled ? std::format("{:.2f}", m_LODRangeModifier) : "未启用", "使用左右键调整 LOD 距离倍率。",
+				[]() { if (m_LODRangeModifier != std::numeric_limits<float>::max()) m_LODRangeModifier = std::clamp(m_LODRangeModifier - 0.05f, 0.0f, 1.0f); },
+				[]() { if (m_LODRangeModifier != std::numeric_limits<float>::max()) m_LODRangeModifier = std::clamp(m_LODRangeModifier + 0.05f, 0.0f, 1.0f); }, lodEnabled);
+			break;
+		}
+
+		case Page::Teleport:
+			addAction("自由镜头位置", std::format("坐标：{:.1f}, {:.1f}, {:.1f}", m_FreeCamPosition.Position.X,
+				m_FreeCamPosition.Position.Y, m_FreeCamPosition.Position.Z), []() { TeleportTo(m_FreeCamPosition.Position); }, playerAvailable);
+			for (const auto& location : TeleportLocations)
+				addAction(location.Name, std::format("坐标：{:.1f}, {:.1f}, {:.1f}", location.Position.X, location.Position.Y, location.Position.Z),
+					[position = location.Position]() { TeleportTo(position); }, playerAvailable);
+			break;
+
+		case Page::Faction:
+		{
+			addToggle("自动中立阵营", "持续把玩家恢复为中立阵营。", m_EnableAutoNeutralFaction,
+				[](bool Enabled) { m_EnableAutoNeutralFaction = Enabled; }, playerAvailable);
+			struct FactionEntry { std::string Name; Ref<RTTIRefObject> Object; };
+			std::vector<FactionEntry> factions;
+			auto& events = ModCoreEvents::GetInstance();
+			{
+				std::shared_lock lock(events.m_CachedDataMutex);
+				factions.reserve(events.m_CachedAIFactions.size());
+				for (auto faction : events.m_CachedAIFactions)
+				{
+					const auto name = faction->GetMemberRefUnsafe<String>("Name");
+					factions.emplace_back(FactionEntry { std::string(name.data(), name.size()), faction });
+				}
+			}
+			std::ranges::sort(factions, {}, &FactionEntry::Name);
+			auto currentFaction = playerAvailable ? reinterpret_cast<RTTIRefObject *>(player->m_Entity->m_Faction) : nullptr;
+			for (const auto& faction : factions)
+			{
+				items.emplace_back(MenuItem {
+					.Label = faction.Name, .Value = faction.Object.GetPtr() == currentFaction ? "当前" : "",
+					.Description = "游戏内部阵营标识；保持英文可避免资源名称歧义。", .Enabled = playerAvailable,
+					.Activate = [factionRef = faction.Object]()
+					{
+						m_EnableAutoNeutralFaction = false;
+						JobHeaderCPU::SubmitCallable([factionRef]()
+						{
+							if (auto p = Player::GetLocalPlayer(); p && p->m_Entity)
+								p->m_Entity->SetFaction(reinterpret_cast<AIFaction *>(factionRef.GetPtr()));
+						});
+					},
+				});
+			}
+			break;
+		}
+
+		case Page::Utilities:
+			addAction("强制快速保存", "立即请求一次快速保存。", []() { ToggleQuickSave(); }, playerAvailable);
+			addAction("读取上一存档", "立即读取最近一次存档。", []() { ToggleQuickLoad(); }, playerAvailable);
+			addAction("玩家物品栏", "打开物品管理窗口。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
+			addAction("实体生成器", "打开实体生成窗口。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
+			addAction("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
+			addAction("关闭修改器菜单", "关闭菜单并恢复游戏输入。", []() { SetMenuVisible(false); });
+			addSubmenu("结束游戏", "显示确认页面后终止当前游戏进程。", Page::ConfirmExit);
+			break;
+
+		case Page::Developer:
+			addAction("显示日志窗口", "打开模组内部日志窗口。", []() { AddWindow(std::make_shared<LogWindow>()); });
+			addAction("显示 ImGui 演示窗口", "打开 Dear ImGui 官方英文演示窗口。", []() { AddWindow(std::make_shared<DemoWindow>()); });
+			addAction("导出 RTTI 结构", "将已扫描的 RTTI 类型导出到游戏目录。", []()
+			{
+				RTTIYamlExporter exporter(RTTIScanner::GetAllTypes());
+				exporter.ExportRTTITypes(".");
+			}, !RTTIScanner::GetAllTypes().empty());
+			addAction("导出玩家组件", "将玩家实体及组件信息写入日志。", []() { DumpPlayerComponents(); }, playerAvailable);
+			items.emplace_back(MenuItem { .Label = "项目版本", .Value = "0.17 中文版", .Description = "HFW Gameplay Tweaks；原作者 Nukem。", .Enabled = false });
+			break;
+
+		case Page::ConfirmExit:
+			addAction("取消", "返回上一页，不结束游戏。", [this]() { GoBack(); });
+			addAction("确认结束游戏", "立即终止游戏进程；未保存进度会丢失。", []() { TerminateProcess(GetCurrentProcess(), 0); });
+			break;
+		}
+
+		return items;
 	}
 
-	void MainMenuBar::DrawCheatsMenu()
+	bool MainMenuBar::HandleMenuInput(std::vector<MenuItem>& Items)
 	{
-		auto debugSettings = DebugSettings::GetInstance();
-		auto player = Player::GetLocalPlayer();
+		if (Items.empty())
+			return false;
+		if (ImGui::GetIO().WantTextInput || ImGui::IsAnyItemActive())
+			return false;
 
-		if (!player || !player->m_Entity)
+		auto& state = m_Navigation.back();
+		state.SelectedIndex = std::min(state.SelectedIndex, Items.size() - 1);
+
+		if (IsNavigationKeyPressed(ImGuiKey_UpArrow, ImGuiKey_W))
+		{
+			state.SelectedIndex = state.SelectedIndex == 0 ? Items.size() - 1 : state.SelectedIndex - 1;
+			return false;
+		}
+
+		if (IsNavigationKeyPressed(ImGuiKey_DownArrow, ImGuiKey_S))
+		{
+			state.SelectedIndex = (state.SelectedIndex + 1) % Items.size();
+			return false;
+		}
+
+		if (IsNavigationKeyPressed(ImGuiKey_LeftArrow, ImGuiKey_A))
+		{
+			auto& item = Items[state.SelectedIndex];
+			if (item.Enabled && item.AdjustLeft)
+				item.AdjustLeft();
+			return true;
+		}
+
+		if (IsNavigationKeyPressed(ImGuiKey_RightArrow, ImGuiKey_D))
+		{
+			auto& item = Items[state.SelectedIndex];
+			if (item.Enabled)
+			{
+				if (item.AdjustRight)
+					item.AdjustRight();
+				else if (item.IsSubmenu)
+					ActivateItem(item);
+			}
+			return true;
+		}
+
+		if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+		{
+			ActivateItem(Items[state.SelectedIndex]);
+			return true;
+		}
+
+		if (ImGui::IsKeyPressed(ImGuiKey_Backspace, false) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+		{
+			GoBack();
+			return true;
+		}
+
+		return false;
+	}
+
+	void MainMenuBar::DrawTrainerFrame(std::vector<MenuItem>& Items)
+	{
+		auto& io = ImGui::GetIO();
+		auto& state = m_Navigation.back();
+		state.SelectedIndex = std::min(state.SelectedIndex, Items.size() - 1);
+
+		const float scale = std::clamp(io.DisplaySize.y / 1080.0f, 0.80f, 1.25f);
+		const float width = 430.0f * scale;
+		const float headerHeight = 76.0f * scale;
+		const float breadcrumbHeight = 30.0f * scale;
+		const float rowHeight = 32.0f * scale;
+		const float footerHeight = 92.0f * scale;
+		const size_t maximumVisibleRows = 12;
+		const size_t visibleRows = std::min(maximumVisibleRows, Items.size());
+		const float height = headerHeight + breadcrumbHeight + rowHeight * visibleRows + footerHeight;
+
+		if (state.SelectedIndex < state.ScrollOffset)
+			state.ScrollOffset = state.SelectedIndex;
+		else if (state.SelectedIndex >= state.ScrollOffset + visibleRows)
+			state.ScrollOffset = state.SelectedIndex - visibleRows + 1;
+
+		const auto maximumScroll = Items.size() > visibleRows ? Items.size() - visibleRows : 0;
+		state.ScrollOffset = std::min(state.ScrollOffset, maximumScroll);
+
+		const ImVec2 position(
+			std::max(18.0f * scale, std::min(34.0f * scale, io.DisplaySize.x - width - 18.0f * scale)),
+			std::max(18.0f * scale, std::min(72.0f * scale, io.DisplaySize.y - height - 18.0f * scale)));
+
+		ImGui::SetNextWindowPos(position, ImGuiCond_Always);
+		ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Always);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.018f, 0.030f, 0.038f, 0.965f));
+		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.12f, 0.66f, 0.72f, 0.85f));
+
+		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
+			ImGuiWindowFlags_NoNavFocus;
+
+		int requestedActivation = -1;
+		bool requestedBack = false;
+
+		if (ImGui::Begin("##HFWTrainerMenu", nullptr, flags))
+		{
+			auto draw = ImGui::GetWindowDrawList();
+			const auto windowPosition = ImGui::GetWindowPos();
+			const auto font = ImGui::GetFont();
+			const float fontSize = ImGui::GetFontSize();
+
+			const ImVec2 headerMin = windowPosition;
+			const ImVec2 headerMax(windowPosition.x + width, windowPosition.y + headerHeight);
+			draw->AddRectFilledMultiColor(headerMin, headerMax,
+				IM_COL32(17, 124, 137, 255), IM_COL32(7, 60, 79, 255),
+				IM_COL32(4, 39, 53, 255), IM_COL32(10, 83, 96, 255));
+			draw->AddRectFilled(ImVec2(headerMin.x, headerMax.y - 3.0f * scale), headerMax, IM_COL32(226, 169, 60, 255));
+			draw->AddText(font, fontSize * 1.34f, ImVec2(headerMin.x + 18.0f * scale, headerMin.y + 13.0f * scale),
+				IM_COL32(244, 250, 250, 255), "HORIZON FORBIDDEN WEST");
+			draw->AddText(font, fontSize * 0.92f, ImVec2(headerMin.x + 19.0f * scale, headerMin.y + 45.0f * scale),
+				IM_COL32(194, 226, 228, 255), "游戏调整与修改器菜单");
+
+			ImGui::SetCursorScreenPos(ImVec2(windowPosition.x, windowPosition.y + headerHeight));
+			ImGui::Dummy(ImVec2(width, breadcrumbHeight));
+			const ImVec2 breadcrumbMin(windowPosition.x, windowPosition.y + headerHeight);
+			const ImVec2 breadcrumbMax(windowPosition.x + width, breadcrumbMin.y + breadcrumbHeight);
+			draw->AddRectFilled(breadcrumbMin, breadcrumbMax, IM_COL32(7, 17, 23, 250));
+			draw->AddText(font, fontSize * 0.90f, ImVec2(breadcrumbMin.x + 14.0f * scale, breadcrumbMin.y + 7.0f * scale),
+				IM_COL32(128, 207, 213, 255), GetPageTitle());
+
+			if (ImGui::IsWindowHovered() && io.MouseWheel != 0.0f)
+			{
+				if (io.MouseWheel > 0.0f)
+					state.SelectedIndex = state.SelectedIndex == 0 ? Items.size() - 1 : state.SelectedIndex - 1;
+				else
+					state.SelectedIndex = (state.SelectedIndex + 1) % Items.size();
+
+				if (state.SelectedIndex < state.ScrollOffset)
+					state.ScrollOffset = state.SelectedIndex;
+				else if (state.SelectedIndex >= state.ScrollOffset + visibleRows)
+					state.ScrollOffset = state.SelectedIndex - visibleRows + 1;
+			}
+
+			for (size_t visibleIndex = 0; visibleIndex < visibleRows; visibleIndex++)
+			{
+				const size_t itemIndex = state.ScrollOffset + visibleIndex;
+				auto& item = Items[itemIndex];
+				const ImVec2 rowMin(windowPosition.x, breadcrumbMax.y + rowHeight * visibleIndex);
+				const ImVec2 rowMax(windowPosition.x + width, rowMin.y + rowHeight);
+
+				ImGui::SetCursorScreenPos(rowMin);
+				ImGui::PushID(static_cast<int>(itemIndex));
+				ImGui::InvisibleButton("##TrainerRow", ImVec2(width, rowHeight));
+				const bool hovered = ImGui::IsItemHovered();
+				if (hovered)
+					state.SelectedIndex = itemIndex;
+
+				const bool selected = state.SelectedIndex == itemIndex;
+				if (selected)
+				{
+					draw->AddRectFilled(rowMin, rowMax, item.Enabled ? IM_COL32(223, 239, 239, 248) : IM_COL32(72, 82, 84, 245));
+					draw->AddRectFilled(rowMin, ImVec2(rowMin.x + 4.0f * scale, rowMax.y), IM_COL32(226, 169, 60, 255));
+				}
+				else if (hovered)
+					draw->AddRectFilled(rowMin, rowMax, IM_COL32(24, 71, 79, 220));
+
+				draw->AddLine(ImVec2(rowMin.x, rowMax.y), rowMax, IM_COL32(43, 65, 70, 145));
+				const auto textColor = !item.Enabled ? IM_COL32(110, 119, 121, 255)
+					: selected ? IM_COL32(12, 22, 25, 255) : IM_COL32(231, 238, 238, 255);
+				const auto valueColor = !item.Enabled ? IM_COL32(102, 111, 113, 255)
+					: selected ? IM_COL32(22, 80, 87, 255) : IM_COL32(105, 205, 214, 255);
+				draw->AddText(font, fontSize, ImVec2(rowMin.x + 15.0f * scale, rowMin.y + 7.0f * scale), textColor, item.Label.c_str());
+
+				if (!item.Value.empty())
+				{
+					const auto valueWidth = ImGui::CalcTextSize(item.Value.c_str()).x;
+					draw->AddText(font, fontSize, ImVec2(rowMax.x - valueWidth - 15.0f * scale, rowMin.y + 7.0f * scale),
+						valueColor, item.Value.c_str());
+				}
+
+				if (item.Enabled && ImGui::IsItemClicked(ImGuiMouseButton_Left))
+					requestedActivation = static_cast<int>(itemIndex);
+				ImGui::PopID();
+			}
+
+			const ImVec2 footerMin(windowPosition.x, breadcrumbMax.y + rowHeight * visibleRows);
+			const ImVec2 footerMax(windowPosition.x + width, footerMin.y + footerHeight);
+			draw->AddRectFilled(footerMin, footerMax, IM_COL32(5, 13, 18, 252));
+			draw->AddLine(footerMin, ImVec2(footerMax.x, footerMin.y), IM_COL32(31, 133, 143, 220));
+
+			const auto pageCounter = std::format("{} / {}", state.SelectedIndex + 1, Items.size());
+			const auto counterWidth = ImGui::CalcTextSize(pageCounter.c_str()).x;
+			draw->AddText(font, fontSize * 0.88f, ImVec2(footerMax.x - counterWidth - 13.0f * scale, footerMin.y + 7.0f * scale),
+				IM_COL32(226, 169, 60, 255), pageCounter.c_str());
+			draw->AddText(font, fontSize * 0.88f, ImVec2(footerMin.x + 13.0f * scale, footerMin.y + 7.0f * scale),
+				IM_COL32(130, 157, 161, 255), "上下选择  左右调整  回车确认  退格返回");
+			const auto& description = Items[state.SelectedIndex].Description;
+			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMin.x + 13.0f * scale, footerMin.y + 34.0f * scale),
+				IM_COL32(208, 220, 221, 255), description.c_str(), nullptr, width - 26.0f * scale);
+
+			if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+				requestedBack = true;
+		}
+
+		ImGui::End();
+		ImGui::PopStyleColor(2);
+		ImGui::PopStyleVar(3);
+
+		if (requestedBack)
+			GoBack();
+		else if (requestedActivation >= 0 && std::cmp_less(requestedActivation, Items.size()))
+			ActivateItem(Items[requestedActivation]);
+	}
+
+	void MainMenuBar::ActivateItem(MenuItem& Item)
+	{
+		if (Item.Enabled && Item.Activate)
+			Item.Activate();
+	}
+
+	void MainMenuBar::OpenPage(Page Target)
+	{
+		m_Navigation.emplace_back(NavigationState { .PageId = Target });
+	}
+
+	void MainMenuBar::GoBack()
+	{
+		if (m_Navigation.size() > 1)
+			m_Navigation.pop_back();
+		else
+			SetMenuVisible(false);
+	}
+
+	const char *MainMenuBar::GetPageTitle() const
+	{
+		switch (m_Navigation.back().PageId)
+		{
+		case Page::Home: return "主菜单";
+		case Page::Player: return "玩家选项";
+		case Page::World: return "世界与时间";
+		case Page::Teleport: return "传送";
+		case Page::Faction: return "玩家阵营";
+		case Page::Utilities: return "实用工具";
+		case Page::Developer: return "开发者工具";
+		case Page::ConfirmExit: return "确认结束游戏";
+		}
+
+		return "主菜单";
+	}
+
+	void MainMenuBar::TeleportTo(const WorldPosition& Target)
+	{
+		auto position = Target;
+		position.Z += 0.5;
+
+		if (m_FreeCamMode == FreeCamMode::Noclip)
+		{
+			m_FreeCamPosition.Position = position;
+			return;
+		}
+
+		JobHeaderCPU::SubmitCallable([position]()
+		{
+			auto player = Player::GetLocalPlayer();
+			auto entity = player ? player->m_Entity : nullptr;
+			if (!entity || !entity->m_Mover)
+				return;
+
+			auto worldTransform = entity->GetWorldTransform();
+			worldTransform.Position = position;
+			entity->m_Mover->OverrideMovement(worldTransform, 0.0001f, false);
+		});
+	}
+
+	void MainMenuBar::DumpPlayerComponents()
+	{
+		auto player = Player::GetLocalPlayer();
+		auto entity = player ? player->m_Entity : nullptr;
+		if (!entity)
 			return;
 
-		if (ImGui::MenuItem("启用穿墙模式###EnableNoclip", nullptr, m_FreeCamMode == FreeCamMode::Noclip))
-			ToggleNoclip();
+		spdlog::info("Player RTTI: '{}' UUID: '{}'", entity->GetRTTI()->GetSymbolName(), entity->m_UUID);
+		if (auto resource = entity->m_EntityResource.GetUntypedPtr())
+			spdlog::info("\tResource RTTI: '{}' UUID: '{}'", resource->GetRTTI()->GetSymbolName(), resource->m_UUID);
 
-		if (ImGui::MenuItem("启用自由镜头###EnableFreeCamera", nullptr, m_FreeCamMode == FreeCamMode::Free))
-			ToggleFreeflyCamera();
-
-		if (auto destructibility = player->m_Entity->m_Destructibility)
+		spdlog::info("");
+		for (size_t i = 0; i < entity->m_Components.m_Components.size(); i++)
 		{
-			if (ImGui::MenuItem("启用无敌模式###EnableGodMode", nullptr, &m_EnableGodMode))
+			const auto& component = entity->m_Components.m_Components[i];
+			if (!component)
 			{
-				m_EnableDemigodMode = false;
-				destructibility->m_Invulnerable = m_EnableGodMode;
-				destructibility->m_DieAtZeroHealth = true;
+				spdlog::warn("Component {} is null", i);
+				continue;
 			}
 
-			if (ImGui::MenuItem("启用半无敌模式###EnableDemigodMode", nullptr, &m_EnableDemigodMode))
+			spdlog::info(
+				"Component {}: RTTI: '{}' UUID: '{}' (0x{:X})",
+				i,
+				component->GetRTTI()->GetSymbolName(),
+				component->m_UUID,
+				reinterpret_cast<uintptr_t>(component));
+
+			if (auto resource = reinterpret_cast<RTTIRefObject *>(component->m_Resource.GetPtr()))
 			{
-				m_EnableGodMode = false;
-				destructibility->m_Invulnerable = false;
-				destructibility->m_DieAtZeroHealth = !m_EnableDemigodMode;
+				spdlog::info(
+					"\tResource RTTI: '{}' UUID: '{}' (0x{:X})",
+					resource->GetRTTI()->GetSymbolName(),
+					resource->m_UUID,
+					reinterpret_cast<uintptr_t>(resource));
 			}
 		}
-
-		if (ImGui::MenuItem("启用无限备用弹药###EnableInfiniteAmmo", nullptr, &debugSettings->m_InfiniteAmmo))
-		{
-			debugSettings->m_InfiniteSizeClip = false;
-			m_EnableInfiniteClipAmmo = false;
-		}
-
-		if (ImGui::MenuItem("启用无限弹匣弹药###EnableInfiniteClipAmmo", nullptr, &m_EnableInfiniteClipAmmo))
-		{
-			debugSettings->m_InfiniteAmmo = false;
-			debugSettings->m_InfiniteSizeClip = m_EnableInfiniteClipAmmo;
-		}
-
-		ImGui::MenuItem("启用无限武器耐力###EnableInfiniteStamina", nullptr, &debugSettings->m_Inexhaustible);
-		ImGui::MenuItem("##sep1", nullptr, nullptr, false);
-
-		if (ImGui::BeginMenu("传送到……###TeleportTo"))
-		{
-			auto doTeleport = [&](const char *Name, WorldPosition Position)
-			{
-				if (!ImGui::MenuItem(std::format("{} ({:.1f}, {:.1f}, {:.1f})", Name, Position.X, Position.Y, Position.Z).c_str()))
-					return;
-
-				// Fixup so Aloy doesn't fall through the ground
-				Position.Z += 0.5;
-
-				if (m_FreeCamMode == FreeCamMode::Noclip)
-				{
-					m_FreeCamPosition.Position = Position;
-				}
-				else
-				{
-					JobHeaderCPU::SubmitCallable([Position]()
-					{
-						if (auto player = Player::GetLocalPlayer())
-						{
-							auto worldTransform = player->m_Entity->GetWorldTransform();
-							worldTransform.Position = Position;
-
-							player->m_Entity->m_Mover->OverrideMovement(worldTransform, 0.0001f, false);
-						}
-					});
-				}
-			};
-
-			doTeleport("自由镜头位置", m_FreeCamPosition.Position);
-			ImGui::MenuItem("##septeleport1", nullptr, nullptr, false);
-			doTeleport("HZD - 子午城入口", { 3918.612, 5465.897, 830.652 });
-			doTeleport("HZD - 尖塔", { 4162.499, 4757.230, 774.453 });
-			doTeleport("HZD - 庄园", { 4082.374, 4614.900, 710.106 });
-			doTeleport("HZD - 门地", { 4695.546, 5482.825, 787.018 });
-			doTeleport("HZD - 孤光", { 4772.899, 5777.062 , 780.938 });
-			doTeleport("HZD - 炽焰拱门", { 3086.388, 5931.355, 813.258 });
-			doTeleport("HZD - 炼铸厂 ZETA", { 4050.798, 6724.117, 840.551 });
-			doTeleport("HZD - 日落之地竞技场", { 3009.000, 6565.725, 868.025 });
-			doTeleport("HZD - 造者末途", { 3435.481, 7210.677, 825.362 });
-			doTeleport("HZD - 丹特", { 1662.439, 5811.224, 794.055 });
-			doTeleport("HZD - 耀光峡谷", { 5260.463, 6411.703, 820.775 });
-			ImGui::MenuItem("##septeleport2", nullptr, nullptr, false);
-			doTeleport("HFW - 开场过场动画 1", { 5737.400, -2394.600, 432.400 });
-			doTeleport("HFW - 开场过场动画 2", { 6315.800, -1698.400, 320.100 });
-			doTeleport("HFW - 开场过场动画 3", { 6942.200, -1713.900, 321.000 });
-			doTeleport("HFW - 开场过场动画 4（树之梦）", { 2691.584, -3752.680, 477.490 });
-			doTeleport("HFW - 序章教学区域", { 5645.362, -2886.453, 403.551 });
-			doTeleport("HFW - 序章法尔·泽尼斯设施", { 5993.999, -2915.253, 334.978 });
-			doTeleport("HFW - 序章法尔·泽尼斯航天飞机", { 6465.844, -3147.694, 331.482 });
-			doTeleport("HFW - 贫瘠之光山地要塞", { 2690.644, 441.522, 677.341 });
-			doTeleport("HFW - 炙炎海岸首领战区域", { -140.415, -4405.686, 291.182 });
-			doTeleport("HFW - 炙炎海岸未完成区域", { 2107.752, -6777.761, 302.759 });
-			doTeleport("HFW - 顶级猎杀：西浅滩", { -4531.792, -460.949, 185.629 });
-			doTeleport("HFW - 顶级猎杀：灰峰", { -1452.500, -614.100, 520.100 });
-			doTeleport("HFW - 法尔·泽尼斯基地", { -1417.900, -3088.700, 283.900 });
-
-			ImGui::EndMenu();
-		}
-
-		// Faction
-		if (ImGui::BeginMenu("玩家阵营……###PlayerFaction"))
-		{
-			auto& modEvents = ModCoreEvents::GetInstance();
-			std::shared_lock lock(modEvents.m_CachedDataMutex);
-			std::vector sortedFactions(modEvents.m_CachedAIFactions.begin(), modEvents.m_CachedAIFactions.end());
-
-			std::ranges::sort(
-				sortedFactions,
-				[](auto A, auto B)
-				{
-					return A->GetMemberRefUnsafe<String>("Name") < B->GetMemberRefUnsafe<String>("Name");
-				});
-
-			for (auto faction : sortedFactions)
-			{
-				if (ImGui::MenuItem(
-					faction->GetMemberRefUnsafe<String>("Name").c_str(),
-					nullptr,
-					reinterpret_cast<RTTIRefObject *>(player->m_Entity->m_Faction) == faction))
-				{
-					m_EnableAutoNeutralFaction = false;
-
-					JobHeaderCPU::SubmitCallable([factionRef = Ref(faction)]
-					{
-						if (auto player = Player::GetLocalPlayer(); player && player->m_Entity)
-							player->m_Entity->SetFaction(reinterpret_cast<AIFaction *>(factionRef.GetPtr()));
-					});
-				}
-			}
-
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::MenuItem("玩家物品栏……###PlayerInventory"))
-			AddWindow(std::make_shared<PlayerInventoryWindow>());
-
-		if (ImGui::MenuItem("实体生成器……###EntitySpawner"))
-			AddWindow(std::make_shared<EntitySpawnerWindow>());
-
-		if (ImGui::MenuItem("天气设置……###WeatherSetup"))
-			AddWindow(std::make_shared<WeatherSetupWindow>());
-
-		ImGui::MenuItem("##sep2", nullptr, nullptr, false);
-		ImGui::MenuItem("模拟游戏已完成###SimulateGameCompleted", nullptr, &debugSettings->m_SPAllUnlocked);
-		ImGui::MenuItem("在游戏中应用拍照模式设置###ApplyPhotomodeSettingsIngame", nullptr, &debugSettings->m_ApplyPhotoModeSettingsIngame);
-	}
-
-	void MainMenuBar::DrawMiscellaneousMenu()
-	{
-		if (ImGui::MenuItem("显示日志窗口###ShowLogWindow"))
-			AddWindow(std::make_shared<LogWindow>());
-
-		if (ImGui::MenuItem("显示 ImGui 演示窗口（英文）###ShowImGuiDemoWindow"))
-			AddWindow(std::make_shared<DemoWindow>());
-
-		if (ImGui::MenuItem("导出 RTTI 结构###DumpRTTIStructures", nullptr, false, !RTTIScanner::GetAllTypes().empty()))
-		{
-			RTTIYamlExporter exporter(RTTIScanner::GetAllTypes());
-			exporter.ExportRTTITypes(".");
-		}
-
-#if 0
-		if (ImGui::MenuItem("导出完整游戏类型信息###DumpFullgameTypeinfo", nullptr, false, false))
-		{
-		}
-#endif
-
-		if (ImGui::MenuItem("导出玩家组件###DumpPlayerComponents"))
-		{
-			if (auto player = Player::GetLocalPlayer())
-			{
-				if (auto entity = player->m_Entity)
-				{
-					spdlog::info("Player RTTI: '{}' UUID: '{}'", entity->GetRTTI()->GetSymbolName(), entity->m_UUID);
-
-					if (auto resource = entity->m_EntityResource.GetUntypedPtr())
-						spdlog::info("\tResource RTTI: '{}' UUID: '{}'", resource->GetRTTI()->GetSymbolName(), resource->m_UUID);
-
-					spdlog::info("");
-
-					for (size_t i = 0; i < entity->m_Components.m_Components.size(); i++)
-					{
-						const auto& component = entity->m_Components.m_Components[i];
-
-						spdlog::info(
-							"Component {}: RTTI: '{}' UUID: '{}' (0x{:X})",
-							i,
-							component->GetRTTI()->GetSymbolName(),
-							component->m_UUID,
-							reinterpret_cast<uintptr_t>(component));
-
-						if (auto resource = reinterpret_cast<HRZ2::RTTIRefObject *>(component->m_Resource.GetPtr()))
-							spdlog::info(
-								"\tResource RTTI: '{}' UUID: '{}' (0x{:X})",
-								resource->GetRTTI()->GetSymbolName(),
-								resource->m_UUID,
-								reinterpret_cast<uintptr_t>(resource));
-					}
-				}
-			}
-		}
-
-#if 0
-		{
-			static bool instrumentationActive = false;
-			static std::unordered_set<void *> resourcesPresentAtStart;
-			static size_t currentRootIndex = std::numeric_limits<size_t>::max();
-			static size_t targetRootIndex = std::numeric_limits<size_t>::max();
-			static size_t loadingRootIndex = std::numeric_limits<size_t>::max();
-			static StreamingRefBase streamingRefRoot;
-
-			if (ImGui::MenuItem("开始检测###BeginInstrumentation", nullptr, false, false) || instrumentationActive)
-			{
-				auto& modEvents = ModCoreEvents::GetInstance();
-				auto& resourceList = modEvents.m_CachedInventoryItems;
-
-				// Gather the initial resources available in the main menu
-				if (!instrumentationActive)
-				{
-					streamingRefRoot.Clear();
-					resourcesPresentAtStart.clear();
-
-					std::shared_lock lock(modEvents.m_CachedDataMutex);
-					resourcesPresentAtStart.insert(resourceList.begin(), resourceList.end());
-
-					instrumentationActive = true;
-					targetRootIndex = 0;
-				}
-
-				// Perform a diff with a new group finishes loading
-				if (currentRootIndex != targetRootIndex && streamingRefRoot.GetUntypedPtr())
-				{
-					std::shared_lock lock(modEvents.m_CachedDataMutex);
-					for (const auto& resource : resourceList)
-					{
-						if (!resourcesPresentAtStart.contains(resource))
-						{
-							auto& nameRef = resource->GetMemberRefUnsafe<Ref<RTTIRefObject>>("ItemName");
-
-							if (nameRef)
-							{
-								const auto func = Offsets::Signature("48 89 5C 24 10 48 89 74 24 18 57 48 83 EC 30 48 8B 05")
-													  .ToPointer<String *(RTTIRefObject *, String *)>();
-
-								String str; // ctor is wrong
-								func(nameRef, &str);
-
-								spdlog::info(
-									"InventoryItem {{\"UUID\": \"{}\", \"RootUUID\": \"{}\", \"Name\": \"{}\"}}",
-									resource->m_UUID,
-									streamingRefRoot.GetUUID(),
-									str);
-							}
-						}
-					}
-
-					currentRootIndex = targetRootIndex;
-					targetRootIndex += 1;
-				}
-
-				// Queue the next load
-				if (loadingRootIndex != targetRootIndex)
-				{
-					spdlog::info("Loading root index {}", targetRootIndex);
-
-					auto streamingManager = StreamingManager::GetInstance();
-					streamingRefRoot.Clear();
-					streamingManager->Register2(streamingRefRoot, {}, ModConfiguration.CachedRoots[targetRootIndex].RootUUID);
-					streamingManager->Resolve(streamingRefRoot, EStreamingRefPriority::AboveNormal);
-
-					loadingRootIndex = targetRootIndex;
-				}
-			}
-		}
-#endif
-
-		ImGui::MenuItem("##blankseparator0", nullptr, nullptr, false);
-
-		// LOD bias
-		if (ImGui::MenuItem("启用 LOD 偏差覆盖###EnableLODBiasOverride", nullptr, m_LODRangeModifier != std::numeric_limits<float>::max()))
-			m_LODRangeModifier = m_LODRangeModifier == std::numeric_limits<float>::max() ? 1.0f : std::numeric_limits<float>::max();
-		ImGui::MenuItem("偏差###Bias", nullptr, nullptr, false);
-		if (float t = m_LODRangeModifier == std::numeric_limits<float>::max() ? 1.0f : m_LODRangeModifier;
-			ImGui::SliderFloat("##LODDragFloat", &t, 0.0f, 1.0f))
-			m_LODRangeModifier = t;
-
-		ImGui::MenuItem("##blankseparator1", nullptr, nullptr, false);
-		ImGui::MenuItem("##blankseparator2", nullptr, nullptr, false);
-
-		if (ImGui::MenuItem("终止游戏进程###TerminateProcess"))
-			TerminateProcess(GetCurrentProcess(), 0);
 	}
 
 	void MainMenuBar::ToggleVisibility()
 	{
-		m_IsVisible = !m_IsVisible;
+		SetMenuVisible(!m_IsVisible);
 	}
 
 	void MainMenuBar::TogglePauseGameLogic()
@@ -478,15 +712,16 @@ namespace HRZ2::DebugUI
 		JobHeaderCPU::SubmitCallback([]()
 		{
 			auto player = static_cast<PlayerGame *>(Player::GetLocalPlayer());
-
 			if (!player)
 				return;
 
-			const auto func = Offsets::Signature("40 57 48 83 EC 50 4C 8B 15 ? ? ? ? 4D 8B D9 41 0F B6 F8 4D 85 D2")
-								  .ToPointer<void(uint8_t, bool, bool, const GGUUID&)>();
+			const auto save = Offsets::Signature("40 57 48 83 EC 50 4C 8B 15 ? ? ? ? 4D 8B D9 41 0F B6 F8 4D 85 D2")
+				.ToPointer<void(uint8_t, bool, bool, const GGUUID&)>();
+			if (!save)
+				return;
 
 			player->m_RestartOnSpawned = true;
-			func(2, false, false, {}); // ESaveGameType::Quick
+			save(2, false, false, {});
 		});
 	}
 
@@ -497,10 +732,10 @@ namespace HRZ2::DebugUI
 			if (!Player::GetLocalPlayer())
 				return;
 
-			const auto func = Offsets::Signature("40 55 57 48 8D 6C 24 B1 48 81 EC 88 00 00 00 48 8B 05")
+			const auto load = Offsets::Signature("40 55 57 48 8D 6C 24 B1 48 81 EC 88 00 00 00 48 8B 05")
 				.ToPointer<void(float, uint8_t)>();
-
-			func(0.0f, 1); // ESaveGameRestoreReason::Manual
+			if (load)
+				load(0.0f, 1);
 		});
 	}
 
@@ -511,7 +746,7 @@ namespace HRZ2::DebugUI
 
 	void MainMenuBar::AdjustTimescale(float Adjustment)
 	{
-		m_Timescale = std::max(m_Timescale + Adjustment, 0.001f);
+		m_Timescale = std::clamp(m_Timescale + Adjustment, 0.001f, 10.0f);
 		m_TimescaleOverride = true;
 	}
 
@@ -519,12 +754,10 @@ namespace HRZ2::DebugUI
 	{
 		auto player = Player::GetLocalPlayer();
 		auto camera = player ? player->GetLastActivatedCamera() : nullptr;
-
 		if (!camera)
 			return;
 
-		m_FreeCamMode = (m_FreeCamMode == FreeCamMode::Free) ? FreeCamMode::Off : FreeCamMode::Free;
-
+		m_FreeCamMode = m_FreeCamMode == FreeCamMode::Free ? FreeCamMode::Off : FreeCamMode::Free;
 		if (m_FreeCamMode == FreeCamMode::Free)
 			m_FreeCamPosition = camera->GetWorldTransform();
 	}
@@ -533,11 +766,10 @@ namespace HRZ2::DebugUI
 	{
 		auto player = Player::GetLocalPlayer();
 		auto entity = player ? player->m_Entity : nullptr;
-
 		if (!entity)
 			return;
 
-		m_FreeCamMode = (m_FreeCamMode == FreeCamMode::Noclip) ? FreeCamMode::Off : FreeCamMode::Noclip;
+		m_FreeCamMode = m_FreeCamMode == FreeCamMode::Noclip ? FreeCamMode::Off : FreeCamMode::Noclip;
 		m_FreeCamPosition = entity->GetWorldTransform();
 	}
 }

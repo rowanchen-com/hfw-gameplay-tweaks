@@ -123,6 +123,7 @@ namespace InternalModConfig
 			PARSE_TOML_MEMBER(general, DebugMenuFontScale);
 			PARSE_TOML_MEMBER(general, DebugMenuFontPath);
 			PARSE_TOML_MEMBER(general, DebugMenuFontSize);
+			o.DebugMenuUseHardwareCursor = (*general)["DebugMenuUseHardwareCursor"].value_or(true);
 		}
 
 		if (o.DebugMenuFontScale <= 0.0f)

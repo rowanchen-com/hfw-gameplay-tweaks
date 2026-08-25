@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <format>
 #include <mutex>
+#include <shared_mutex>
 #include "../../ModConfiguration.h"
 #include "../../ModCoreEvents.h"
 #include "../Core/Entity.h"
@@ -67,7 +68,7 @@ namespace HRZ2::DebugUI
 		static int spawnCount = 1;
 		static int spawnLocationType = 0;
 		static WorldPosition customSpawnPosition;
-		static RTTIRefObject *customFaction = nullptr;
+		static Ref<RTTIRefObject> customFaction;
 
 		const bool allowSpawn = m_LastSelectedSetupIndex < ModConfiguration.CachedSpawnSetups.size() && m_OutstandingSpawnCount == 0;
 
@@ -75,6 +76,7 @@ namespace HRZ2::DebugUI
 		ImGui::BeginDisabled(!allowSpawn);
 		ImGui::PushItemWidth(300);
 		ImGui::InputInt("##entitycount", &spawnCount);
+		spawnCount = std::max(spawnCount, 1);
 		{
 			// Draw faction list
 			auto& modEvents = ModCoreEvents::GetInstance();
@@ -82,7 +84,7 @@ namespace HRZ2::DebugUI
 
 			String previewString = "<未指定阵营>";
 			
-			if (!modEvents.m_CachedAIFactions.contains(customFaction))
+			if (!modEvents.m_CachedAIFactions.contains(customFaction.GetPtr()))
 				customFaction = nullptr;
 			else
 				previewString = customFaction->GetMemberRefUnsafe<String>("Name");
@@ -98,12 +100,12 @@ namespace HRZ2::DebugUI
 						return A->GetMemberRefUnsafe<String>("Name") < B->GetMemberRefUnsafe<String>("Name");
 					});
 
-				if (ImGui::Selectable("<未指定阵营>###UnsetFaction", customFaction == nullptr))
+				if (ImGui::Selectable("<未指定阵营>###UnsetFaction", !customFaction))
 					customFaction = nullptr;
 
 				for (auto faction : sortedFactions)
 				{
-					const bool isSelected = customFaction == faction;
+					const bool isSelected = customFaction.GetPtr() == faction;
 
 					if (ImGui::Selectable(faction->GetMemberRefUnsafe<String>("Name").c_str(), isSelected))
 						customFaction = faction;
@@ -135,10 +137,17 @@ namespace HRZ2::DebugUI
 		// Spawn button
 		if (ImGui::Button("生成###Spawn") || (m_DoSpawnOnNextFrame && allowSpawn))
 		{
-			m_NextSpawnTransform = GetSpawnTransform(spawnLocationType, customSpawnPosition);
-			m_NextSpawnSelectedIndex = m_LastSelectedSetupIndex;
-			m_NextFaction = customFaction;
-			m_OutstandingSpawnCount = spawnCount;
+			if (auto transform = GetSpawnTransform(spawnLocationType, customSpawnPosition))
+			{
+				m_NextSpawnTransform = *transform;
+				m_NextSpawnSelectedIndex = m_LastSelectedSetupIndex;
+				m_NextFaction = customFaction;
+				m_OutstandingSpawnCount = static_cast<uint32_t>(spawnCount);
+			}
+			else
+			{
+				spdlog::warn("Entity spawn was ignored because the player or camera was unavailable.");
+			}
 		}
 
 		ImGui::Spacing();
@@ -166,10 +175,17 @@ namespace HRZ2::DebugUI
 	void EntitySpawnerWindow::RunSpawnCommands()
 	{
 		// Faction setup logic
-		if (!m_FactionSetsPending.empty())
+		if (!m_FactionUpdateJobPending.exchange(true))
 		{
-			JobHeaderCPU::SubmitCallable(
-				[this]
+			bool hasPendingEntries = false;
+			{
+				std::shared_lock lock(m_FactionSetupMutex);
+				hasPendingEntries = !m_FactionSetsPending.empty();
+			}
+
+			if (hasPendingEntries)
+			{
+				JobHeaderCPU::SubmitCallable([this]
 				{
 					std::scoped_lock lock(m_FactionSetupMutex);
 
@@ -183,13 +199,20 @@ namespace HRZ2::DebugUI
 
 							if (auto entity = getSpawnpointEntity(Pair.first))
 							{
-								entity->SetFaction(reinterpret_cast<HRZ2::AIFaction *>(Pair.second));
+								entity->SetFaction(reinterpret_cast<HRZ2::AIFaction *>(Pair.second.GetPtr()));
 								return true;
 							}
 
 							return false;
 						});
+
+					m_FactionUpdateJobPending.store(false);
 				});
+			}
+			else
+			{
+				m_FactionUpdateJobPending.store(false);
+			}
 		}
 
 		// Streaming and spawnpoint logic
@@ -241,7 +264,7 @@ namespace HRZ2::DebugUI
 				 spawnCount = m_OutstandingSpawnCount,
 				 spawnSetup = targetSpawnSetup,
 				 transform = m_NextSpawnTransform,
-				 faction = m_NextFaction]()
+					 faction = m_NextFaction]()
 				{
 					const auto spawnpointRTTI = RTTI::FindTypeByName("Spawnpoint")->AsCompound();
 
@@ -273,9 +296,12 @@ namespace HRZ2::DebugUI
 		}
 	}
 
-	WorldTransform EntitySpawnerWindow::GetSpawnTransform(uint32_t Type, const WorldPosition& CustomPosition)
+	std::optional<WorldTransform> EntitySpawnerWindow::GetSpawnTransform(uint32_t Type, const WorldPosition& CustomPosition)
 	{
 		auto player = Player::GetLocalPlayer();
+		if (!player || !player->m_Entity)
+			return std::nullopt;
+
 		auto currentTransform = player->m_Entity->GetWorldTransform();
 
 		if (Type == 0)
@@ -286,7 +312,11 @@ namespace HRZ2::DebugUI
 		else if (Type == 1)
 		{
 			// Crosshair position - project forwards
-			const auto cameraMatrix = player->GetLastActivatedCamera()->GetWorldTransform();
+			auto camera = player->GetLastActivatedCamera();
+			if (!camera)
+				return std::nullopt;
+
+			const auto cameraMatrix = camera->GetWorldTransform();
 			const auto moveDirection = cameraMatrix.Orientation.Forward() * 200.0f;
 
 			currentTransform.Position += moveDirection;
@@ -317,7 +347,7 @@ namespace HRZ2::DebugUI
 											   uint32_t&,			 // a13
 											   uint32_t&)>();		 // a14
 
-			intersectLine(
+			const bool didHit = intersectLine(
 				cameraMatrix.Position,
 				currentTransform.Position,
 				47,
@@ -333,7 +363,8 @@ namespace HRZ2::DebugUI
 				uint1,
 				uint2);
 
-			currentTransform.Position = rayHitPosition;
+			if (didHit)
+				currentTransform.Position = rayHitPosition;
 		}
 		else if (Type == 2)
 		{

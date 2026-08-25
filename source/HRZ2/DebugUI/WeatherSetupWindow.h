@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <imgui.h>
 #include "../Core/IStreamingManager.h"
 #include "DebugUIWindow.h"
@@ -29,6 +30,7 @@ namespace HRZ2::DebugUI
 
 		WeatherSetupLoaderCallback m_LoaderCallback;
 		GGUUID m_NextWeatherSetupUUID = {};
+		std::atomic_bool m_StreamerRequestPending = false;
 		bool m_DoSetOnNextFrame = false;
 
 		static inline size_t m_LastSelectedIndex = std::numeric_limits<size_t>::max();
@@ -37,6 +39,7 @@ namespace HRZ2::DebugUI
 	public:
 		virtual void Render() override;
 		virtual bool Close() override;
+		virtual void Reopen() override { m_WindowOpen = true; }
 		virtual std::string GetId() const override;
 	};
 }

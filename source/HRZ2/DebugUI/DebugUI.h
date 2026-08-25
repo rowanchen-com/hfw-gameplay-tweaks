@@ -11,8 +11,9 @@ namespace HRZ2
 
 namespace HRZ2::DebugUI
 {
-	void Initialize(NxDXGIImpl *DXGIImpl);
+	bool Initialize(NxDXGIImpl *DXGIImpl);
 	void AddWindow(std::shared_ptr<Window> Handle);
+	void SetMenuVisible(bool Visible);
 
 	void RenderUI();
 	void RenderUID3D(NxD3DImpl *D3DImpl, NxDXGIImpl *DXGIImpl);

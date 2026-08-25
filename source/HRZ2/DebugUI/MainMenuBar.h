@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <vector>
 #include "../Core/WorldTransform.h"
 #include "DebugUIWindow.h"
 
@@ -49,8 +54,48 @@ namespace HRZ2::DebugUI
 		static void ToggleNoclip();
 
 	private:
-		void DrawGameplayMenu();
-		void DrawCheatsMenu();
-		void DrawMiscellaneousMenu();
+		enum class Page : uint8_t
+		{
+			Home,
+			Player,
+			World,
+			Teleport,
+			Faction,
+			Utilities,
+			Developer,
+			ConfirmExit,
+		};
+
+		struct NavigationState
+		{
+			Page PageId = Page::Home;
+			size_t SelectedIndex = 0;
+			size_t ScrollOffset = 0;
+		};
+
+		struct MenuItem
+		{
+			std::string Label;
+			std::string Value;
+			std::string Description;
+			bool Enabled = true;
+			bool IsSubmenu = false;
+			std::function<void()> Activate;
+			std::function<void()> AdjustLeft;
+			std::function<void()> AdjustRight;
+		};
+
+		std::vector<NavigationState> m_Navigation { NavigationState {} };
+
+		std::vector<MenuItem> BuildMenuItems();
+		void DrawTrainerFrame(std::vector<MenuItem>& Items);
+		bool HandleMenuInput(std::vector<MenuItem>& Items);
+		void ActivateItem(MenuItem& Item);
+		void OpenPage(Page Target);
+		void GoBack();
+		const char *GetPageTitle() const;
+
+		static void TeleportTo(const WorldPosition& Position);
+		static void DumpPlayerComponents();
 	};
 }

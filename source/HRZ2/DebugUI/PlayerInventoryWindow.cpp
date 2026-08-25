@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <format>
 #include <shared_mutex>
+#include <unordered_set>
 #include "../../ModConfiguration.h"
 #include "../../ModCoreEvents.h"
 #include "../Core/Entity.h"
@@ -22,6 +24,7 @@ namespace HRZ2::DebugUI
 
 		std::shared_lock lock(ModCoreEvents::GetInstance().m_CachedDataMutex);
 		TrySpawn(targetUUID, targetCount);
+		static_cast<PlayerInventoryWindow *>(Userdata)->m_StreamerRequestPending.store(false);
 	}
 
 	void InventoryItemSpawnCallback::OnUnloaded(RTTIRefObject *Object, void *Userdata) {}
@@ -56,11 +59,9 @@ namespace HRZ2::DebugUI
 						const auto addOverflowItem = Offsets::Signature("44 88 4C 24 20 44 89 44 24 18 53 55 56 57 41 55 41 57 48 83 EC 68")
 														 .ToPointer<bool(EntityComponent *, EntityResource *, int, bool)>();
 
-						addOverflowItem(
-							entity->m_Components.FindComponentByRTTI(RTTI::FindTypeByName("InventoryOverflowComponent")),
-							item,
-							ItemCount,
-							true);
+						auto overflow = entity->m_Components.FindComponentByRTTI(RTTI::FindTypeByName("InventoryOverflowComponent"));
+						if (addOverflowItem && overflow)
+							addOverflowItem(overflow, item, ItemCount, true);
 					}
 				});
 
@@ -103,16 +104,15 @@ namespace HRZ2::DebugUI
 
 			struct SortEntry
 			{
-				const GGUUID *UUID = nullptr;
-				std::variant<String, const std::string *> Name; // Performance reasons
-				InventoryItem *Hint = nullptr;
+				GGUUID UUID;
+				bool HasUUID = false;
+				std::string Name;
+				Ref<InventoryItem> Hint;
+				uint32_t Amount = 0;
 
 				operator const char *() const
 				{
-					if (Name.index() == 0)
-						return std::get<0>(Name).c_str();
-
-					return std::get<1>(Name)->c_str();
+					return Name.c_str();
 				}
 
 				bool operator<(const SortEntry& Other) const
@@ -120,7 +120,7 @@ namespace HRZ2::DebugUI
 					if (auto result = strcmp(*this, Other); result != 0)
 						return result < 0;
 
-					return (UUID && Other.UUID) ? *UUID < *Other.UUID : false;
+					return HasUUID && Other.HasUUID ? UUID < Other.UUID : false;
 				}
 			};
 
@@ -129,35 +129,46 @@ namespace HRZ2::DebugUI
 
 			if (playerEntity)
 			{
-				std::lock_guard lock(playerEntity->m_EntityAccessMutex);
-				auto playerInventory = playerEntity->m_Components.FindComponentByRTTI<Inventory>(RTTI::FindTypeByName("Inventory"));
-
 				std::vector<SortEntry> sortedItems;
 				std::unordered_set<GGUUID> knownInventoryItems;
 
-				if (playerInventory)
 				{
-					for (const auto& item : playerInventory->m_Items)
+					// Retain references while holding the game mutex, then release it before filtering,
+					// sorting, and drawing thousands of cached rows.
+					std::lock_guard lock(playerEntity->m_EntityAccessMutex);
+					auto playerInventory = playerEntity->m_Components.FindComponentByRTTI<Inventory>(RTTI::FindTypeByName("Inventory"));
+
+					if (playerInventory)
 					{
-						auto& s = sortedItems.emplace_back(
-							item.Value->m_EntityResource ? &item.Value->m_EntityResource->m_UUID : nullptr,
-							item.Value->GetDisplayName(),
-							item.Value);
-
-						if (s.UUID)
+						for (const auto& item : playerInventory->m_Items)
 						{
-							if (!m_ShowLocalizedItemNames) // Delocalize it. Fast binary search.
-							{
-								const auto itr = std::lower_bound(
-									ModConfiguration.CachedInventoryItems.begin(),
-									ModConfiguration.CachedInventoryItems.end(),
-									*s.UUID);
+							SortEntry entry;
+							entry.Hint = item.Value;
+							entry.Amount = item.Value->m_Amount;
 
-								if (itr != ModConfiguration.CachedInventoryItems.end() && itr->UUID == *s.UUID)
-									s.Name = &itr->Name;
+							const auto displayName = item.Value->GetDisplayName();
+							entry.Name.assign(displayName.data(), displayName.size());
+
+							if (item.Value->m_EntityResource)
+							{
+								entry.UUID = item.Value->m_EntityResource->m_UUID;
+								entry.HasUUID = true;
+
+								if (!m_ShowLocalizedItemNames) // Delocalize it. Fast binary search.
+								{
+									const auto itr = std::lower_bound(
+										ModConfiguration.CachedInventoryItems.begin(),
+										ModConfiguration.CachedInventoryItems.end(),
+										entry.UUID);
+
+									if (itr != ModConfiguration.CachedInventoryItems.end() && itr->UUID == entry.UUID)
+										entry.Name = itr->Name;
+								}
+
+								knownInventoryItems.emplace(entry.UUID);
 							}
 
-							knownInventoryItems.emplace(*s.UUID);
+							sortedItems.emplace_back(std::move(entry));
 						}
 					}
 				}
@@ -167,7 +178,11 @@ namespace HRZ2::DebugUI
 					for (const auto& item : ModConfiguration.CachedInventoryItems)
 					{
 						if (!knownInventoryItems.contains(item.UUID))
-							sortedItems.emplace_back(&item.UUID, &item.Name, nullptr);
+							sortedItems.emplace_back(SortEntry {
+								.UUID = item.UUID,
+								.HasUUID = true,
+								.Name = item.Name,
+							});
 					}
 				}
 
@@ -181,31 +196,35 @@ namespace HRZ2::DebugUI
 
 				std::ranges::sort(sortedItems);
 
-				// Then draw
-				for (const auto& entry : sortedItems)
+				// Only build ImGui rows that are visible in the scrolling table.
+				ImGuiListClipper clipper;
+				clipper.Begin(static_cast<int>(sortedItems.size()));
+
+				while (clipper.Step())
 				{
-					const auto resourceUUID = entry.UUID ? *entry.UUID : GGUUID {};
-
-					if (entry.UUID)
-						ImGui::PushID(entry.UUID);
-					else
-						ImGui::PushID(entry.Hint);
-					ImGui::TableNextRow();
-
-					ImGui::TableSetColumnIndex(0);
-					ImGui::Selectable(entry, false, ImGuiSelectableFlags_SpanAllColumns);
-					DrawTableContextMenu(entry.Hint, resourceUUID);
-
-					if (entry.Hint)
+					for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
 					{
-						ImGui::TableSetColumnIndex(1);
-						ImGui::Text("%u", entry.Hint->m_Amount);
+						const auto& entry = sortedItems[i];
+						const auto resourceUUID = entry.HasUUID ? entry.UUID : GGUUID {};
+
+						ImGui::PushID(entry.HasUUID ? static_cast<const void *>(&entry.UUID) : static_cast<const void *>(entry.Hint.GetPtr()));
+						ImGui::TableNextRow();
+
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Selectable(entry, false, ImGuiSelectableFlags_SpanAllColumns);
+						DrawTableContextMenu(entry.Hint.GetPtr(), resourceUUID);
+
+						if (entry.Hint)
+						{
+							ImGui::TableSetColumnIndex(1);
+							ImGui::Text("%u", entry.Amount);
+						}
+
+						ImGui::TableSetColumnIndex(2);
+						ImGui::Text(std::format("{}", resourceUUID).c_str());
+
+						ImGui::PopID();
 					}
-
-					ImGui::TableSetColumnIndex(2);
-					ImGui::Text(std::format("{}", resourceUUID).c_str());
-
-					ImGui::PopID();
 				}
 			}
 
@@ -272,31 +291,50 @@ namespace HRZ2::DebugUI
 		}
 		else if (itemCount != 0)
 		{
-			m_NextItemSpawnUUID = ItemUUID;
-			m_NextItemCount = static_cast<uint32_t>(itemCount);
+			const auto targetItemCount = static_cast<uint32_t>(itemCount);
 
 			const bool itemWasAlreadySpawned = [&]()
 			{
 				std::shared_lock lock(ModCoreEvents::GetInstance().m_CachedDataMutex);
-				return m_LoaderCallback.TrySpawn(m_NextItemSpawnUUID, m_NextItemCount);
+				return m_LoaderCallback.TrySpawn(ItemUUID, targetItemCount);
 			}();
 
 			if (!itemWasAlreadySpawned)
 			{
-				// We have to manually resolve a root UUID now
-				const auto itr = std::lower_bound(
-					ModConfiguration.CachedInventoryItems.begin(),
-					ModConfiguration.CachedInventoryItems.end(),
-					m_NextItemSpawnUUID);
-
-				if (itr != ModConfiguration.CachedInventoryItems.end() && itr->UUID == m_NextItemSpawnUUID)
+				if (m_StreamerRequestPending.exchange(true))
 				{
-					auto streamingManager = StreamingManager::GetInstance();
+					spdlog::warn("Ignored an inventory spawn request because another item is still streaming.");
+				}
+				else
+				{
+					m_NextItemSpawnUUID = ItemUUID;
+					m_NextItemCount = targetItemCount;
 
-					g_TargetRef.Clear();
-					streamingManager->Register2(g_TargetRef, {}, itr->RootUUID);
-					streamingManager->RegisterCallback(g_TargetRef, EStreamingRefCallbackMode::OnLoad, &m_LoaderCallback, this);
-					streamingManager->Resolve(g_TargetRef, EStreamingRefPriority::Normal);
+					// We have to manually resolve a root UUID now
+					const auto itr = std::lower_bound(
+						ModConfiguration.CachedInventoryItems.begin(),
+						ModConfiguration.CachedInventoryItems.end(),
+						m_NextItemSpawnUUID);
+
+					if (itr != ModConfiguration.CachedInventoryItems.end() && itr->UUID == m_NextItemSpawnUUID)
+					{
+						auto streamingManager = StreamingManager::GetInstance();
+						if (streamingManager)
+						{
+							g_TargetRef.Clear();
+							streamingManager->Register2(g_TargetRef, {}, itr->RootUUID);
+							streamingManager->RegisterCallback(g_TargetRef, EStreamingRefCallbackMode::OnLoad, &m_LoaderCallback, this);
+							streamingManager->Resolve(g_TargetRef, EStreamingRefPriority::Normal);
+						}
+						else
+						{
+							m_StreamerRequestPending.store(false);
+						}
+					}
+					else
+					{
+						m_StreamerRequestPending.store(false);
+					}
 				}
 			}
 		}

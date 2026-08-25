@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 namespace HRZ2
 {
 	template<typename T>
@@ -39,7 +41,15 @@ namespace HRZ2
 
 		Ref<T>& operator=(Ref<T>&& Other) noexcept
 		{
-			m_Ref = std::exchange(Other.m_Ref, nullptr);
+			if (this == &Other)
+				return *this;
+
+			const auto incoming = std::exchange(Other.m_Ref, nullptr);
+			const auto old = std::exchange(m_Ref, incoming);
+
+			if (old)
+				old->Release();
+
 			return *this;
 		}
 
