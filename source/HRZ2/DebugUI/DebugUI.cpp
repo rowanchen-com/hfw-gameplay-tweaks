@@ -530,12 +530,6 @@ namespace HRZ2::DebugUI
 			if (ModConfiguration.Hotkeys.ToggleDebugUI == VK_OEM_3 && wParam == VK_OEM_8)
 				wParam = VK_OEM_3; // Workaround for UK keyboard layouts
 
-			// Keep Space available to the game for its normal ground jump. A fresh key press only
-			// queues one extra upward impulse; keyboard auto-repeat must not create continuous flight.
-			const bool isInitialKeyPress = (lParam & (1LL << 30)) == 0;
-			if (!MainMenuBar::m_IsVisible && wParam == VK_SPACE && isInitialKeyPress)
-				TrainerCheats::RequestInfiniteJump();
-
 			const bool isModHotkey =
 				wParam == ModConfiguration.Hotkeys.ToggleDebugUI ||
 				wParam == ModConfiguration.Hotkeys.TogglePauseGameLogic ||
@@ -666,6 +660,14 @@ namespace HRZ2::DebugUI
 
 	void UpdatePlayerSpecific()
 	{
+		// Poll the physical Space state so the jump trigger also works when the game receives
+		// keyboard input through Raw Input instead of legacy WM_KEYDOWN messages.
+		static bool wasSpaceDown = false;
+		const bool spaceDown = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+		if (!MainMenuBar::m_IsVisible && spaceDown && !wasSpaceDown)
+			TrainerCheats::RequestInfiniteJump();
+		wasSpaceDown = spaceDown;
+
 		auto debugSettings = DebugSettings::GetInstance();
 		auto player = Player::GetLocalPlayer();
 		TrainerCheats::UpdatePlayerState(player);
