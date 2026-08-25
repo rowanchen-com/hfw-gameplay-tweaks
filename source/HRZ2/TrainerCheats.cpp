@@ -37,6 +37,8 @@ namespace
 	std::atomic<float> g_defenseMultiplier = 2.0f;
 	std::atomic<float> g_experienceMultiplier = 2.0f;
 	std::atomic<float> g_infiniteJumpHeightMultiplier = 10.0f;
+	std::atomic<float> g_movementSpeedMultiplier = 3.0f;
+	std::atomic<float> g_fallSpeedMultiplier = 0.5f;
 	std::atomic_uint32_t g_infiniteJumpBypassUpdates = 0;
 	std::atomic_uint32_t g_toolsAmount = 0;
 	std::atomic_uint32_t g_ammoAmount = 0;
@@ -425,6 +427,10 @@ namespace HRZ2::TrainerCheats
 	void SetExperienceMultiplier(float Value) { g_experienceMultiplier.store(std::clamp(Value, 1.0f, 100.0f)); }
 	float GetInfiniteJumpHeightMultiplier() { return g_infiniteJumpHeightMultiplier.load(); }
 	void SetInfiniteJumpHeightMultiplier(float Value) { g_infiniteJumpHeightMultiplier.store(std::clamp(Value, 1.0f, 50.0f)); }
+	float GetMovementSpeedMultiplier() { return g_movementSpeedMultiplier.load(); }
+	void SetMovementSpeedMultiplier(float Value) { g_movementSpeedMultiplier.store(std::clamp(Value, 0.1f, 10.0f)); }
+	float GetFallSpeedMultiplier() { return g_fallSpeedMultiplier.load(); }
+	void SetFallSpeedMultiplier(float Value) { g_fallSpeedMultiplier.store(std::clamp(Value, 0.1f, 5.0f)); }
 	void RequestInfiniteJump()
 	{
 		if (IsAvailable(Feature::InfiniteJump) && IsEnabled(Feature::InfiniteJump))
@@ -579,30 +585,71 @@ namespace
 			code.L(complete);
 		});
 
-		// Port the CT's verified high-jump path, but leave its horizontal speed multiplier out.
-		// The Z component is multiplied at the game's motion-vector write; fall physics is untouched.
-		const auto infiniteJumpHeight = FindPattern("C5 F8 11 87 60 01 00 00 48 8B 8F");
-		const bool infiniteJumpHeightAvailable = InstallMidHook("InfiniteJumpHeight", infiniteJumpHeight, 8,
+		// The CT's movement-vector path exposes horizontal speed (X/Y) and jump height (Z).
+		// Keep their feature flags and multipliers independent even though they share one hook.
+		const auto movementVector = FindPattern("C5 F8 11 87 60 01 00 00 48 8B 8F");
+		const bool movementVectorAvailable = InstallMidHook("MovementSpeedAndJumpHeight", movementVector, 8,
 			[](Xbyak::CodeGenerator& code)
 		{
-			Xbyak::Label original;
+			Xbyak::Label skipMovementSpeed, skipJumpHeight;
 			EmitOriginal(code, { 0xC5, 0xF8, 0x11, 0x87, 0x60, 0x01, 0x00, 0x00 });
-			EmitFlagCheck(code, Feature::InfiniteJump, original);
 			code.pushfq();
 			code.push(r11);
 			code.sub(rsp, 0x10);
 			code.movdqu(ptr[rsp], xmm15);
+
+			code.mov(r11, FlagAddress(Feature::MovementSpeed));
+			code.cmp(dword[r11], 0);
+			code.je(skipMovementSpeed);
+			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_movementSpeedMultiplier));
+			code.movss(xmm15, dword[rdi + 0x160]);
+			code.mulss(xmm15, dword[r11]);
+			code.movss(dword[rdi + 0x160], xmm15);
+			code.movss(xmm15, dword[rdi + 0x164]);
+			code.mulss(xmm15, dword[r11]);
+			code.movss(dword[rdi + 0x164], xmm15);
+
+			code.L(skipMovementSpeed);
+			code.mov(r11, FlagAddress(Feature::InfiniteJump));
+			code.cmp(dword[r11], 0);
+			code.je(skipJumpHeight);
 			code.movss(xmm15, dword[rdi + 0x168]);
 			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_infiniteJumpHeightMultiplier));
 			code.mulss(xmm15, dword[r11]);
 			code.movss(dword[rdi + 0x168], xmm15);
+
+			code.L(skipJumpHeight);
 			code.movdqu(xmm15, ptr[rsp]);
 			code.add(rsp, 0x10);
 			code.pop(r11);
 			code.popfq();
-			code.L(original);
 		});
-		SetAvailability(Feature::InfiniteJump, infiniteJumpStateAvailable && infiniteJumpHeightAvailable);
+		SetAvailability(Feature::InfiniteJump, infiniteJumpStateAvailable && movementVectorAvailable);
+		SetAvailability(Feature::MovementSpeed, movementVectorAvailable);
+
+		const auto fallSpeed = FindPattern("C5 FA 11 9B 80 01 00 00");
+		const bool fallSpeedAvailable = InstallMidHook("FallSpeed", fallSpeed, 8, [](Xbyak::CodeGenerator& code)
+		{
+			Xbyak::Label original, complete;
+			EmitFlagCheck(code, Feature::FallSpeed, original);
+			code.pushfq();
+			code.push(r11);
+			code.sub(rsp, 0x10);
+			code.movdqu(ptr[rsp], xmm15);
+			code.movss(xmm15, xmm3);
+			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_fallSpeedMultiplier));
+			code.mulss(xmm15, dword[r11]);
+			code.movss(dword[rbx + 0x180], xmm15);
+			code.movdqu(xmm15, ptr[rsp]);
+			code.add(rsp, 0x10);
+			code.pop(r11);
+			code.popfq();
+			code.jmp(complete);
+			code.L(original);
+			EmitOriginal(code, { 0xC5, 0xFA, 0x11, 0x9B, 0x80, 0x01, 0x00, 0x00 });
+			code.L(complete);
+		});
+		SetAvailability(Feature::FallSpeed, fallSpeedAvailable);
 
 		const auto ignoreHits = FindPattern("48 8B F9 A9 00 00 00 A0 0F 85 ? ? 00 00");
 		const bool ignoreHitsAvailable = InstallMidHook("IgnoreHits", ignoreHits, 8, [](Xbyak::CodeGenerator& code)

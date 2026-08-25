@@ -221,8 +221,16 @@ namespace HRZ2::DebugUI
 			}, playerAvailable);
 			addValueEditor("无限跳高度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::InfiniteJump)
 				? std::format("{:.1f}x", TrainerCheats::GetInfiniteJumpHeightMultiplier()) : "关闭",
-				"启用后松开并重新按下空格可在空中再次起跳；高度使用 CT 的运动倍率路径，下降保持原版速度。",
+				"启用后松开并重新按下空格可在空中再次起跳；本项只改高度，下降速度可在下一项独立设置。",
 				TrainerValueEditorWindow::Mode::InfiniteJump, TrainerCheats::Feature::InfiniteJump);
+			addValueEditor("移动速度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::MovementSpeed)
+				? std::format("{:.1f}x", TrainerCheats::GetMovementSpeedMultiplier()) : "关闭",
+				"独立调整水平移动速度；1.0 为原版，默认输入值为 3.0。",
+				TrainerValueEditorWindow::Mode::MovementSpeed, TrainerCheats::Feature::MovementSpeed);
+			addValueEditor("下降速度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::FallSpeed)
+				? std::format("{:.2f}x", TrainerCheats::GetFallSpeedMultiplier()) : "关闭",
+				"独立调整下降速度；1.0 为原版，默认输入值为 0.5。",
+				TrainerValueEditorWindow::Mode::FallSpeed, TrainerCheats::Feature::FallSpeed);
 			addToggle("完全无敌", "合并引擎无敌与无视命中判定；特征码不可用时仍保留引擎无敌。", m_EnableGodMode, [](bool Enabled)
 			{
 				TrainerCheats::SetEnabled(TrainerCheats::Feature::IgnoreHits, Enabled);
@@ -247,6 +255,12 @@ namespace HRZ2::DebugUI
 					d->m_DieAtZeroHealth = !Enabled;
 				}
 			}, playerAvailable);
+			addValueEditor("防御倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DefenseMultiplier)
+				? std::format("{:.1f}x", TrainerCheats::GetDefenseMultiplier()) : "关闭",
+				"打开数字窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DefenseMultiplier,
+				TrainerCheats::Feature::DefenseMultiplier);
+			addFeatureToggle("无限氧气", "水下活动时不再消耗氧气。", TrainerCheats::Feature::InfiniteOxygen);
+			addFeatureToggle("药用浆果袋保持满额", "消耗药用浆果后立即恢复到当前容量。", TrainerCheats::Feature::MaxMedicinePouch);
 			addToggle("无限备用弹药", "射击时不消耗物品栏中的备用弹药。", debugAvailable && debugSettings->m_InfiniteAmmo, [](bool Enabled)
 			{
 				if (auto s = DebugSettings::GetInstance())
@@ -273,8 +287,6 @@ namespace HRZ2::DebugUI
 			addFeatureToggle("无限专注", "持续恢复武器轮盘与瞄准使用的专注值。", TrainerCheats::Feature::InfiniteFocus);
 			addFeatureToggle("无限勇气", "持续补充勇气激增所需的勇气值。", TrainerCheats::Feature::InfiniteValor);
 			addFeatureToggle("无限技能持续时间", "冻结受支持技能的剩余持续时间。", TrainerCheats::Feature::InfiniteSkillDuration);
-			addFeatureToggle("无限氧气", "水下活动时不再消耗氧气。", TrainerCheats::Feature::InfiniteOxygen);
-			addFeatureToggle("药用浆果袋保持满额", "消耗药用浆果后立即恢复到当前容量。", TrainerCheats::Feature::MaxMedicinePouch);
 			addFeatureToggle("弓箭瞬间蓄力", "拉弓时立即达到完整蓄力。", TrainerCheats::Feature::InstantBowCharge);
 			addFeatureToggle("超级伤害 / 一击必杀", "把对敌人的有效伤害提高到极高数值；部分特殊目标可能仍有剧情保护。",
 				TrainerCheats::Feature::SuperDamage);
@@ -282,10 +294,6 @@ namespace HRZ2::DebugUI
 				? std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()) : "关闭",
 				"打开数字窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DamageMultiplier,
 				TrainerCheats::Feature::DamageMultiplier);
-			addValueEditor("防御倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DefenseMultiplier)
-				? std::format("{:.1f}x", TrainerCheats::GetDefenseMultiplier()) : "关闭",
-				"打开数字窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DefenseMultiplier,
-				TrainerCheats::Feature::DefenseMultiplier);
 			addFeatureToggle("隐身模式", "同时关闭相关 AI 发现分支并持续清除警觉状态。", TrainerCheats::Feature::StealthMode);
 			addFeatureToggle("锁定试炼时间", "冻结狩猎场等受支持试炼的计时器。", TrainerCheats::Feature::FreezeTrialTimer);
 			addToggle("自动中立阵营", "持续将玩家阵营恢复为中立。", m_EnableAutoNeutralFaction,

@@ -15,6 +15,8 @@ namespace HRZ2::DebugUI
 			DefenseMultiplier,
 			ExperienceMultiplier,
 			InfiniteJump,
+			MovementSpeed,
+			FallSpeed,
 			ToolsAmount,
 			AmmoAmount,
 			ResourcesAmount,

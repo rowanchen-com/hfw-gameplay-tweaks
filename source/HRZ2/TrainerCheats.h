@@ -22,6 +22,8 @@ namespace HRZ2
 			MaxMedicinePouch,
 			InfiniteArrowsAndTraps,
 			InfiniteJump,
+			MovementSpeed,
+			FallSpeed,
 			InstantBowCharge,
 			SuperDamage,
 			DamageMultiplier,
@@ -55,6 +57,10 @@ namespace HRZ2
 		void SetExperienceMultiplier(float Value);
 		float GetInfiniteJumpHeightMultiplier();
 		void SetInfiniteJumpHeightMultiplier(float Value);
+		float GetMovementSpeedMultiplier();
+		void SetMovementSpeedMultiplier(float Value);
+		float GetFallSpeedMultiplier();
+		void SetFallSpeedMultiplier(float Value);
 		void RequestInfiniteJump();
 
 		uint32_t GetItemAmount(Feature Value);

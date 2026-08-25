@@ -22,7 +22,7 @@ Source code for the Horizon Forbidden West mod, with a complete Simplified Chine
 
 ## Integrated trainer features
 
-- Player: complete god mode combines the engine invulnerability and ignore-hit implementations, alongside movement, configurable repeated-space infinite jump with vanilla falling, ammo, infinite arrows and traps, combat, focus/valor/skill duration/oxygen, medicine, stealth, trial timer, instant bow charge, super damage, damage multiplier, and defense multiplier controls.
+- Player: complete god mode combines the engine invulnerability and ignore-hit implementations, alongside independently configurable movement speed, repeated-space jump height, fall speed, ammo, infinite arrows and traps, combat, focus/valor/skill duration/oxygen, medicine, stealth, trial timer, instant bow charge, super damage, damage multiplier, and defense multiplier controls.
 - Resources and progression: runtime crafting/purchase bypass, configurable tool/ammo/resource stack values, experience multiplier, experience grant, and skill-point editing.
 - World and movement: pause and time controls, the existing engine timescale and LOD controls, save location, teleport, undo teleport, the active map waypoint, preset locations, entity spawning, and weather.
 - Existing engine-backed god mode, ammo, free camera, noclip, inventory editor, entity spawner, weather, and world tools remain available. All newly integrated trainer toggles default to off.

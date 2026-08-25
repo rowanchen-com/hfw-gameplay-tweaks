@@ -19,6 +19,8 @@ namespace
 		case Mode::DefenseMultiplier: return Feature::DefenseMultiplier;
 		case Mode::ExperienceMultiplier: return Feature::ExperienceMultiplier;
 		case Mode::InfiniteJump: return Feature::InfiniteJump;
+		case Mode::MovementSpeed: return Feature::MovementSpeed;
+		case Mode::FallSpeed: return Feature::FallSpeed;
 		case Mode::ToolsAmount: return Feature::EditTools;
 		case Mode::AmmoAmount: return Feature::EditAmmo;
 		case Mode::ResourcesAmount: return Feature::EditResources;
@@ -48,6 +50,8 @@ namespace HRZ2::DebugUI
 		case Mode::DefenseMultiplier: m_FloatValue = TrainerCheats::GetDefenseMultiplier(); break;
 		case Mode::ExperienceMultiplier: m_FloatValue = TrainerCheats::GetExperienceMultiplier(); break;
 		case Mode::InfiniteJump: m_FloatValue = TrainerCheats::GetInfiniteJumpHeightMultiplier(); break;
+		case Mode::MovementSpeed: m_FloatValue = TrainerCheats::GetMovementSpeedMultiplier(); break;
+		case Mode::FallSpeed: m_FloatValue = TrainerCheats::GetFallSpeedMultiplier(); break;
 		case Mode::ToolsAmount:
 		case Mode::AmmoAmount:
 		case Mode::ResourcesAmount:
@@ -67,6 +71,8 @@ namespace HRZ2::DebugUI
 		case Mode::DefenseMultiplier: return "防御倍率设置";
 		case Mode::ExperienceMultiplier: return "经验倍率设置";
 		case Mode::InfiniteJump: return "无限跳高度设置";
+		case Mode::MovementSpeed: return "移动速度设置";
+		case Mode::FallSpeed: return "下降速度设置";
 		case Mode::ToolsAmount: return "修改工具数量";
 		case Mode::AmmoAmount: return "修改弹药数量";
 		case Mode::ResourcesAmount: return "修改资源数量";
@@ -79,6 +85,10 @@ namespace HRZ2::DebugUI
 	{
 		if (m_Mode == Mode::InfiniteJump)
 			return "输入跳跃高度倍率。1 为原版，默认 10；数值越大跳得越高。这里只修改 CT 中的高度分量，不启用慢速下降。";
+		if (m_Mode == Mode::MovementSpeed)
+			return "输入水平移动速度倍率。1 为原版，默认 3；只调整移动向量的水平分量，不改变跳跃高度或下降速度。";
+		if (m_Mode == Mode::FallSpeed)
+			return "输入下降速度倍率。1 为原版，默认 0.5；小于 1 会减慢下降，大于 1 会加快下降。";
 		if (IsMultiplier())
 			return "输入倍率并确认后才会启用。关闭倍率会恢复游戏的正常计算。";
 		if (m_Mode == Mode::SkillPoints)
@@ -94,7 +104,8 @@ namespace HRZ2::DebugUI
 
 	bool TrainerValueEditorWindow::UsesFloatValue() const
 	{
-		return IsMultiplier() || m_Mode == Mode::InfiniteJump;
+		return IsMultiplier() || m_Mode == Mode::InfiniteJump || m_Mode == Mode::MovementSpeed ||
+			m_Mode == Mode::FallSpeed;
 	}
 
 	void TrainerValueEditorWindow::Confirm()
@@ -112,6 +123,22 @@ namespace HRZ2::DebugUI
 			TrainerCheats::SetInfiniteJumpHeightMultiplier(m_FloatValue);
 			TrainerCheats::SetEnabled(feature, true);
 			m_Status = std::format("无限跳已启用：高度 {:.2f} 倍。松开并重新按下空格即可再次起跳。", m_FloatValue);
+			return;
+		}
+		if (m_Mode == Mode::MovementSpeed)
+		{
+			m_FloatValue = std::clamp(m_FloatValue, 0.1f, 10.0f);
+			TrainerCheats::SetMovementSpeedMultiplier(m_FloatValue);
+			TrainerCheats::SetEnabled(feature, true);
+			m_Status = std::format("移动速度已启用：{:.2f} 倍。", m_FloatValue);
+			return;
+		}
+		if (m_Mode == Mode::FallSpeed)
+		{
+			m_FloatValue = std::clamp(m_FloatValue, 0.1f, 5.0f);
+			TrainerCheats::SetFallSpeedMultiplier(m_FloatValue);
+			TrainerCheats::SetEnabled(feature, true);
+			m_Status = std::format("下降速度已启用：{:.2f} 倍。", m_FloatValue);
 			return;
 		}
 
@@ -150,6 +177,10 @@ namespace HRZ2::DebugUI
 		TrainerCheats::SetEnabled(feature, false);
 		if (m_Mode == Mode::InfiniteJump)
 			m_Status = "无限跳已关闭。";
+		else if (m_Mode == Mode::MovementSpeed)
+			m_Status = "移动速度调整已关闭，恢复原版速度。";
+		else if (m_Mode == Mode::FallSpeed)
+			m_Status = "下降速度调整已关闭，恢复原版速度。";
 		else
 			m_Status = IsMultiplier() ? "倍率已关闭，恢复游戏默认计算。" : "待处理的数量修改已取消。";
 	}
@@ -208,8 +239,12 @@ namespace HRZ2::DebugUI
 			ImGui::BeginGroup();
 			ImGui::TextWrapped("%s", GetExplanation());
 			ImGui::Spacing();
-			ImGui::TextUnformatted(m_Mode == Mode::InfiniteJump ? "跳跃高度倍率（1 - 50）" :
-				(IsMultiplier() ? "输入倍率" : "输入数量"));
+			const char *valueLabel = "输入数量";
+			if (m_Mode == Mode::InfiniteJump) valueLabel = "跳跃高度倍率（1 - 50）";
+			else if (m_Mode == Mode::MovementSpeed) valueLabel = "移动速度倍率（0.1 - 10）";
+			else if (m_Mode == Mode::FallSpeed) valueLabel = "下降速度倍率（0.1 - 5）";
+			else if (IsMultiplier()) valueLabel = "输入倍率";
+			ImGui::TextUnformatted(valueLabel);
 			ImGui::SetNextItemWidth(width - 40.0f * scale);
 			if (m_RequestKeyboardFocus)
 			{
@@ -227,8 +262,11 @@ namespace HRZ2::DebugUI
 			if (ImGui::Button("确认修改", ImVec2(buttonWidth, 50.0f * scale)))
 				Confirm();
 			ImGui::SameLine(0.0f, buttonGap);
-			const char *secondaryAction = m_Mode == Mode::InfiniteJump ? "关闭无限跳" :
-				(IsMultiplier() ? "关闭倍率" : "取消待处理");
+			const char *secondaryAction = "取消待处理";
+			if (m_Mode == Mode::InfiniteJump) secondaryAction = "关闭无限跳";
+			else if (m_Mode == Mode::MovementSpeed) secondaryAction = "关闭速度调整";
+			else if (m_Mode == Mode::FallSpeed) secondaryAction = "关闭下降调整";
+			else if (IsMultiplier()) secondaryAction = "关闭倍率";
 			if (ImGui::Button(secondaryAction, ImVec2(buttonWidth, 50.0f * scale)))
 				DisableOrCancel();
 
