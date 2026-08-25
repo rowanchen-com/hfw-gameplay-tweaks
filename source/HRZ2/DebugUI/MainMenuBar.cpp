@@ -440,12 +440,12 @@ namespace HRZ2::DebugUI
 		auto& state = m_Navigation.back();
 		state.SelectedIndex = std::min(state.SelectedIndex, Items.size() - 1);
 
-		const float scale = std::clamp(io.DisplaySize.y / 1080.0f, 0.80f, 1.25f);
-		const float width = 430.0f * scale;
-		const float headerHeight = 76.0f * scale;
-		const float breadcrumbHeight = 30.0f * scale;
-		const float rowHeight = 32.0f * scale;
-		const float footerHeight = 92.0f * scale;
+		const float scale = std::clamp(io.DisplaySize.y / 1080.0f, 0.85f, 1.50f);
+		const float width = 520.0f * scale;
+		const float headerHeight = 96.0f * scale;
+		const float breadcrumbHeight = 42.0f * scale;
+		const float rowHeight = 43.0f * scale;
+		const float footerHeight = 150.0f * scale;
 		const size_t maximumVisibleRows = 12;
 		const size_t visibleRows = std::min(maximumVisibleRows, Items.size());
 		const float height = headerHeight + breadcrumbHeight + rowHeight * visibleRows + footerHeight;
@@ -467,8 +467,8 @@ namespace HRZ2::DebugUI
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.018f, 0.030f, 0.038f, 0.965f));
-		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.12f, 0.66f, 0.72f, 0.85f));
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.018f, 0.030f, 0.038f, 0.995f));
+		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.20f, 0.78f, 0.83f, 1.00f));
 
 		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
@@ -489,19 +489,19 @@ namespace HRZ2::DebugUI
 			draw->AddRectFilledMultiColor(headerMin, headerMax,
 				IM_COL32(17, 124, 137, 255), IM_COL32(7, 60, 79, 255),
 				IM_COL32(4, 39, 53, 255), IM_COL32(10, 83, 96, 255));
-			draw->AddRectFilled(ImVec2(headerMin.x, headerMax.y - 3.0f * scale), headerMax, IM_COL32(226, 169, 60, 255));
-			draw->AddText(font, fontSize * 1.34f, ImVec2(headerMin.x + 18.0f * scale, headerMin.y + 13.0f * scale),
-				IM_COL32(244, 250, 250, 255), "HORIZON FORBIDDEN WEST");
-			draw->AddText(font, fontSize * 0.92f, ImVec2(headerMin.x + 19.0f * scale, headerMin.y + 45.0f * scale),
-				IM_COL32(194, 226, 228, 255), "游戏调整与修改器菜单");
+			draw->AddRectFilled(ImVec2(headerMin.x, headerMax.y - 4.0f * scale), headerMax, IM_COL32(236, 178, 66, 255));
+			draw->AddText(font, fontSize * 1.28f, ImVec2(headerMin.x + 20.0f * scale, headerMin.y + 16.0f * scale),
+				IM_COL32(255, 255, 255, 255), "HORIZON FORBIDDEN WEST");
+			draw->AddText(font, fontSize * 0.95f, ImVec2(headerMin.x + 21.0f * scale, headerMin.y + 58.0f * scale),
+				IM_COL32(238, 251, 252, 255), "游戏调整与修改器菜单");
 
 			ImGui::SetCursorScreenPos(ImVec2(windowPosition.x, windowPosition.y + headerHeight));
 			ImGui::Dummy(ImVec2(width, breadcrumbHeight));
 			const ImVec2 breadcrumbMin(windowPosition.x, windowPosition.y + headerHeight);
 			const ImVec2 breadcrumbMax(windowPosition.x + width, breadcrumbMin.y + breadcrumbHeight);
 			draw->AddRectFilled(breadcrumbMin, breadcrumbMax, IM_COL32(7, 17, 23, 250));
-			draw->AddText(font, fontSize * 0.90f, ImVec2(breadcrumbMin.x + 14.0f * scale, breadcrumbMin.y + 7.0f * scale),
-				IM_COL32(128, 207, 213, 255), GetPageTitle());
+			draw->AddText(font, fontSize * 0.94f, ImVec2(breadcrumbMin.x + 17.0f * scale, breadcrumbMin.y + 8.0f * scale),
+				IM_COL32(218, 250, 252, 255), GetPageTitle());
 
 			if (ImGui::IsWindowHovered() && io.MouseWheel != 0.0f)
 			{
@@ -540,16 +540,16 @@ namespace HRZ2::DebugUI
 					draw->AddRectFilled(rowMin, rowMax, IM_COL32(24, 71, 79, 220));
 
 				draw->AddLine(ImVec2(rowMin.x, rowMax.y), rowMax, IM_COL32(43, 65, 70, 145));
-				const auto textColor = !item.Enabled ? IM_COL32(110, 119, 121, 255)
-					: selected ? IM_COL32(12, 22, 25, 255) : IM_COL32(231, 238, 238, 255);
-				const auto valueColor = !item.Enabled ? IM_COL32(102, 111, 113, 255)
-					: selected ? IM_COL32(22, 80, 87, 255) : IM_COL32(105, 205, 214, 255);
-				draw->AddText(font, fontSize, ImVec2(rowMin.x + 15.0f * scale, rowMin.y + 7.0f * scale), textColor, item.Label.c_str());
+				const auto textColor = !item.Enabled ? IM_COL32(151, 160, 162, 255)
+					: selected ? IM_COL32(10, 20, 23, 255) : IM_COL32(255, 255, 255, 255);
+				const auto valueColor = !item.Enabled ? IM_COL32(145, 154, 156, 255)
+					: selected ? IM_COL32(15, 76, 83, 255) : IM_COL32(205, 250, 254, 255);
+				draw->AddText(font, fontSize, ImVec2(rowMin.x + 18.0f * scale, rowMin.y + 9.0f * scale), textColor, item.Label.c_str());
 
 				if (!item.Value.empty())
 				{
 					const auto valueWidth = ImGui::CalcTextSize(item.Value.c_str()).x;
-					draw->AddText(font, fontSize, ImVec2(rowMax.x - valueWidth - 15.0f * scale, rowMin.y + 7.0f * scale),
+					draw->AddText(font, fontSize, ImVec2(rowMax.x - valueWidth - 18.0f * scale, rowMin.y + 9.0f * scale),
 						valueColor, item.Value.c_str());
 				}
 
@@ -565,13 +565,15 @@ namespace HRZ2::DebugUI
 
 			const auto pageCounter = std::format("{} / {}", state.SelectedIndex + 1, Items.size());
 			const auto counterWidth = ImGui::CalcTextSize(pageCounter.c_str()).x;
-			draw->AddText(font, fontSize * 0.88f, ImVec2(footerMax.x - counterWidth - 13.0f * scale, footerMin.y + 7.0f * scale),
-				IM_COL32(226, 169, 60, 255), pageCounter.c_str());
-			draw->AddText(font, fontSize * 0.88f, ImVec2(footerMin.x + 13.0f * scale, footerMin.y + 7.0f * scale),
-				IM_COL32(130, 157, 161, 255), "方向键  回车确认  退格返回  INS关闭");
+			draw->AddText(font, fontSize * 0.90f, ImVec2(footerMax.x - counterWidth - 16.0f * scale, footerMin.y + 10.0f * scale),
+				IM_COL32(240, 184, 72, 255), pageCounter.c_str());
+			draw->AddText(font, fontSize * 0.90f, ImVec2(footerMin.x + 16.0f * scale, footerMin.y + 10.0f * scale),
+				IM_COL32(242, 250, 251, 255), "方向键 / WASD：选择");
+			draw->AddText(font, fontSize * 0.90f, ImVec2(footerMin.x + 16.0f * scale, footerMin.y + 39.0f * scale),
+				IM_COL32(242, 250, 251, 255), "回车：确认  退格：返回  INS：关闭");
 			const auto& description = Items[state.SelectedIndex].Description;
-			draw->AddText(font, fontSize * 0.92f, ImVec2(footerMin.x + 13.0f * scale, footerMin.y + 34.0f * scale),
-				IM_COL32(208, 220, 221, 255), description.c_str(), nullptr, width - 26.0f * scale);
+			draw->AddText(font, fontSize * 0.98f, ImVec2(footerMin.x + 16.0f * scale, footerMin.y + 75.0f * scale),
+				IM_COL32(255, 255, 255, 255), description.c_str(), nullptr, width - 32.0f * scale);
 
 			if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 				requestedBack = true;

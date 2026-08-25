@@ -59,22 +59,31 @@ namespace HRZ2::DebugUI
 			return;
 
 		// Draw weather setup list
+		const float uiScale = GetTrainerUIScale();
 		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###WeatherSetupFilter");
+		ImGui::Checkbox("显示内部资源 ID（高级）###ShowWeatherResourceIds", &m_ShowResourceIds);
 
-		if (ImGui::BeginListBox("##WeatherSetupSelector", ImVec2(-FLT_MIN, -100)))
+		if (ImGui::BeginListBox("##WeatherSetupSelector", ImVec2(-FLT_MIN, -180.0f * uiScale)))
 		{
 			for (size_t i = 0; i < ModConfiguration.CachedWeatherSetups.size(); i++)
 			{
 				const auto& weatherSetup = ModConfiguration.CachedWeatherSetups[i];
 
-				char fullName[256] = {};
-				std::format_to_n(fullName, std::size(fullName) - 1, "{}, {}", weatherSetup.UUID, weatherSetup.Name);
+				char searchName[256] = {};
+				std::format_to_n(searchName, std::size(searchName) - 1, "{} {}", weatherSetup.Name, weatherSetup.UUID);
 
-				if (m_SpawnerNameFilter.PassFilter(fullName))
+				if (m_SpawnerNameFilter.PassFilter(searchName))
 				{
-					const bool isSelected = m_LastSelectedIndex == i;
+					char displayName[256] = {};
+					if (m_ShowResourceIds)
+						std::format_to_n(displayName, std::size(displayName) - 1, "{}  [{}]", weatherSetup.Name, weatherSetup.UUID);
+					else
+						std::format_to_n(displayName, std::size(displayName) - 1, "{}", weatherSetup.Name);
 
-					if (ImGui::Selectable(fullName, isSelected, ImGuiSelectableFlags_AllowDoubleClick))
+					const bool isSelected = m_LastSelectedIndex == i;
+					ImGui::PushID(static_cast<int>(i));
+
+					if (ImGui::Selectable(displayName, isSelected, ImGuiSelectableFlags_AllowDoubleClick))
 					{
 						m_LastSelectedIndex = i;
 
@@ -84,6 +93,7 @@ namespace HRZ2::DebugUI
 
 					if (isSelected)
 						ImGui::SetItemDefaultFocus();
+					ImGui::PopID();
 				}
 			}
 
@@ -94,7 +104,7 @@ namespace HRZ2::DebugUI
 			!m_StreamerRequestPending.load();
 		ImGui::BeginDisabled(!setIsAllowed);
 
-		if ((ImGui::Button("应用###Set") || m_DoSetOnNextFrame) && setIsAllowed)
+		if ((ImGui::Button("应用###Set", ImVec2(180.0f * uiScale, 0.0f)) || m_DoSetOnNextFrame) && setIsAllowed)
 		{
 			const auto targetSetupUUID = ModConfiguration.CachedWeatherSetups[m_LastSelectedIndex].UUID;
 

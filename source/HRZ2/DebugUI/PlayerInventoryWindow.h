@@ -37,6 +37,7 @@ namespace HRZ2::DebugUI
 		ImGuiTextFilter m_NameFilter;
 		bool m_FilterItemsInPlayerInventory = false;
 		bool m_ShowLocalizedItemNames = true;
+		bool m_ShowResourceIds = false;
 
 	public:
 		virtual void Render() override;

@@ -30,22 +30,31 @@ namespace HRZ2::DebugUI
 			return;
 
 		// Draw entity list
+		const float uiScale = GetTrainerUIScale();
 		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###EntitySpawnerFilter");
+		ImGui::Checkbox("显示内部资源 ID（高级）###ShowSpawnerResourceIds", &m_ShowResourceIds);
 
-		if (ImGui::BeginListBox("##SpawnSetupSelector", ImVec2(-FLT_MIN, -200)))
+		if (ImGui::BeginListBox("##SpawnSetupSelector", ImVec2(-FLT_MIN, -360.0f * uiScale)))
 		{
 			for (size_t i = 0; i < ModConfiguration.CachedSpawnSetups.size(); i++)
 			{
 				const auto& spawnSetup = ModConfiguration.CachedSpawnSetups[i];
 
-				char fullName[256] = {};
-				std::format_to_n(fullName, std::size(fullName) - 1, "{}, {}", spawnSetup.UUID, spawnSetup.Name);
+				char searchName[256] = {};
+				std::format_to_n(searchName, std::size(searchName) - 1, "{} {}", spawnSetup.Name, spawnSetup.UUID);
 
-				if (m_SpawnerNameFilter.PassFilter(fullName))
+				if (m_SpawnerNameFilter.PassFilter(searchName))
 				{
-					const bool isSelected = m_LastSelectedSetupIndex == i;
+					char displayName[256] = {};
+					if (m_ShowResourceIds)
+						std::format_to_n(displayName, std::size(displayName) - 1, "{}  [{}]", spawnSetup.Name, spawnSetup.UUID);
+					else
+						std::format_to_n(displayName, std::size(displayName) - 1, "{}", spawnSetup.Name);
 
-					if (ImGui::Selectable(fullName, isSelected, ImGuiSelectableFlags_AllowDoubleClick))
+					const bool isSelected = m_LastSelectedSetupIndex == i;
+					ImGui::PushID(static_cast<int>(i));
+
+					if (ImGui::Selectable(displayName, isSelected, ImGuiSelectableFlags_AllowDoubleClick))
 					{
 						m_LastSelectedSetupIndex = i;
 
@@ -55,6 +64,7 @@ namespace HRZ2::DebugUI
 
 					if (isSelected)
 						ImGui::SetItemDefaultFocus();
+					ImGui::PopID();
 				}
 			}
 
@@ -71,7 +81,7 @@ namespace HRZ2::DebugUI
 
 		ImGui::Separator();
 		ImGui::BeginDisabled(!allowSpawn);
-		ImGui::PushItemWidth(300);
+		ImGui::PushItemWidth(360.0f * uiScale);
 		ImGui::InputInt("##entitycount", &spawnCount);
 		spawnCount = std::max(spawnCount, 1);
 		{
@@ -123,7 +133,7 @@ namespace HRZ2::DebugUI
 
 		if (spawnLocationType == 2)
 		{
-			ImGui::PushItemWidth(200);
+			ImGui::PushItemWidth(260.0f * uiScale);
 			ImGui::InputDouble("X", &customSpawnPosition.X, 1.0, 20.0, "%.3f");
 			ImGui::InputDouble("Y", &customSpawnPosition.Y, 1.0, 20.0, "%.3f");
 			ImGui::InputDouble("Z", &customSpawnPosition.Z, 1.0, 20.0, "%.3f");
@@ -132,7 +142,7 @@ namespace HRZ2::DebugUI
 		}
 
 		// Spawn button
-		if (ImGui::Button("生成###Spawn") || (m_DoSpawnOnNextFrame && allowSpawn))
+		if (ImGui::Button("生成###Spawn", ImVec2(180.0f * uiScale, 0.0f)) || (m_DoSpawnOnNextFrame && allowSpawn))
 		{
 			if (auto transform = GetSpawnTransform(spawnLocationType, customSpawnPosition))
 			{

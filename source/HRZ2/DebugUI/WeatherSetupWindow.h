@@ -32,6 +32,7 @@ namespace HRZ2::DebugUI
 		GGUUID m_NextWeatherSetupUUID = {};
 		std::atomic_bool m_StreamerRequestPending = false;
 		bool m_DoSetOnNextFrame = false;
+		bool m_ShowResourceIds = false;
 
 		static inline size_t m_LastSelectedIndex = std::numeric_limits<size_t>::max();
 		static inline ImGuiTextFilter m_SpawnerNameFilter;

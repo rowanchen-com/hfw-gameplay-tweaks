@@ -84,18 +84,20 @@ namespace HRZ2::DebugUI
 
 		m_NameFilter.Draw("筛选（包含,-排除）###InventoryFilter");
 		ImGui::Checkbox("仅显示玩家物品栏中的物品###ShowOnlyPlayerInventoryItems", &m_FilterItemsInPlayerInventory);
-		ImGui::SameLine();
 		ImGui::Checkbox("显示游戏本地化名称###ShowLocalizedNames", &m_ShowLocalizedItemNames);
+		ImGui::Checkbox("显示内部资源 ID（高级）###ShowInventoryResourceIds", &m_ShowResourceIds);
 
 		const ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
 										   ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
 										   ImGuiTableFlags_SizingFixedFit;
+		const int columnCount = m_ShowResourceIds ? 3 : 2;
 
-		if (ImGui::BeginTable("inventory_item_list", 3, tableFlags))
+		if (ImGui::BeginTable("inventory_item_list", columnCount, tableFlags))
 		{
-			ImGui::TableSetupColumn("名称###Name");
-			ImGui::TableSetupColumn("数量###Count");
-			ImGui::TableSetupColumn("资源 UUID###ResourceUUID");
+			ImGui::TableSetupColumn("名称###Name", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+			ImGui::TableSetupColumn("数量###Count", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 5.0f);
+			if (m_ShowResourceIds)
+				ImGui::TableSetupColumn("内部资源 ID###ResourceUUID", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 20.0f);
 			ImGui::TableSetupScrollFreeze(1, 1);
 			ImGui::TableHeadersRow();
 
@@ -188,7 +190,14 @@ namespace HRZ2::DebugUI
 					sortedItems,
 					[&](const auto& Entry)
 					{
-						return !m_NameFilter.PassFilter(Entry);
+						if (!m_NameFilter.IsActive())
+							return false;
+
+						std::string searchText = Entry.Name;
+						if (Entry.HasUUID)
+							searchText += std::format(" {}", Entry.UUID);
+
+						return !m_NameFilter.PassFilter(searchText.c_str());
 					});
 
 				std::ranges::sort(sortedItems);
@@ -217,8 +226,12 @@ namespace HRZ2::DebugUI
 							ImGui::Text("%u", entry.Amount);
 						}
 
-						ImGui::TableSetColumnIndex(2);
-						ImGui::Text(std::format("{}", resourceUUID).c_str());
+						if (m_ShowResourceIds)
+						{
+							ImGui::TableSetColumnIndex(2);
+							const auto resourceIdText = std::format("{}", resourceUUID);
+							ImGui::TextUnformatted(resourceIdText.c_str());
+						}
 
 						ImGui::PopID();
 					}
@@ -237,7 +250,7 @@ namespace HRZ2::DebugUI
 
 		int64_t itemCount = 0;
 
-		if (ImGui::Selectable("增加 1 个###AddOne", false, 0, ImVec2(200, 0)))
+		if (ImGui::Selectable("增加 1 个###AddOne", false, 0, ImVec2(260.0f * GetTrainerUIScale(), 0)))
 			itemCount += 1;
 
 		if (ImGui::Selectable("增加 5 个###AddFive"))

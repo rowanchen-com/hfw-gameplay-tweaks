@@ -4,6 +4,8 @@
 
 namespace HRZ2::DebugUI
 {
+	float GetTrainerUIScale();
+
 	class TrainerToolWindow final
 	{
 	public:

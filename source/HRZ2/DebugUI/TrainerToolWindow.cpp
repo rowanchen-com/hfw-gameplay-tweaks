@@ -1,18 +1,35 @@
 #include <algorithm>
-#include <cfloat>
 #include "TrainerToolWindow.h"
 
 namespace HRZ2::DebugUI
 {
+	float GetTrainerUIScale()
+	{
+		const float displayHeight = ImGui::GetIO().DisplaySize.y;
+		return std::clamp(displayHeight / 1080.0f, 0.85f, 1.50f);
+	}
+
 	TrainerToolWindow::TrainerToolWindow(const char *Id, const char *Title, bool *Open, const ImVec2& DefaultSize)
 	{
-		ImGui::SetNextWindowSize(DefaultSize, ImGuiCond_FirstUseEver);
-		ImGui::SetNextWindowSizeConstraints(ImVec2(560.0f, 420.0f), ImVec2(FLT_MAX, FLT_MAX));
+		const float scale = GetTrainerUIScale();
+		const auto displaySize = ImGui::GetIO().DisplaySize;
+		const ImVec2 maximumSize(
+			std::max(360.0f, displaySize.x - 32.0f * scale),
+			std::max(320.0f, displaySize.y - 32.0f * scale));
+		const ImVec2 minimumSize(
+			std::min(680.0f * scale, maximumSize.x),
+			std::min(640.0f * scale, maximumSize.y));
+		const ImVec2 scaledDefaultSize(
+			std::clamp(DefaultSize.x * scale, minimumSize.x, maximumSize.x),
+			std::clamp(DefaultSize.y * scale, minimumSize.y, maximumSize.y));
+
+		ImGui::SetNextWindowSize(scaledDefaultSize, ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSizeConstraints(minimumSize, maximumSize);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.018f, 0.030f, 0.038f, 0.985f));
-		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.89f, 0.66f, 0.24f, 0.95f));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, std::max(1.0f, 1.25f * scale));
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.018f, 0.030f, 0.038f, 0.995f));
+		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.95f, 0.72f, 0.28f, 1.00f));
 
 		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
@@ -23,8 +40,9 @@ namespace HRZ2::DebugUI
 
 		const auto windowPosition = ImGui::GetWindowPos();
 		const auto windowSize = ImGui::GetWindowSize();
-		const float headerHeight = std::max(50.0f, ImGui::GetFontSize() * 2.55f);
+		const float headerHeight = std::max(58.0f * scale, ImGui::GetFontSize() * 2.15f);
 		const float closeWidth = headerHeight;
+		const float dividerHeight = std::max(3.0f, 3.0f * scale);
 		auto draw = ImGui::GetWindowDrawList();
 
 		const ImVec2 headerMin = windowPosition;
@@ -37,7 +55,7 @@ namespace HRZ2::DebugUI
 			IM_COL32(4, 39, 53, 255),
 			IM_COL32(10, 83, 96, 255));
 		draw->AddRectFilled(
-			ImVec2(headerMin.x, headerMax.y - 3.0f),
+			ImVec2(headerMin.x, headerMax.y - dividerHeight),
 			headerMax,
 			IM_COL32(226, 169, 60, 255));
 
@@ -53,10 +71,10 @@ namespace HRZ2::DebugUI
 
 		const ImVec2 closeMin(headerMax.x - closeWidth, headerMin.y);
 		ImGui::SetCursorScreenPos(closeMin);
-		ImGui::InvisibleButton("##TrainerToolClose", ImVec2(closeWidth, headerHeight - 3.0f));
+		ImGui::InvisibleButton("##TrainerToolClose", ImVec2(closeWidth, headerHeight - dividerHeight));
 		const bool closeHovered = ImGui::IsItemHovered();
 		if (closeHovered)
-			draw->AddRectFilled(closeMin, ImVec2(headerMax.x, headerMax.y - 3.0f), IM_COL32(168, 54, 48, 210));
+			draw->AddRectFilled(closeMin, ImVec2(headerMax.x, headerMax.y - dividerHeight), IM_COL32(188, 58, 50, 235));
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && Open)
 		{
 			*Open = false;
@@ -65,21 +83,21 @@ namespace HRZ2::DebugUI
 
 		const auto titleSize = ImGui::CalcTextSize(Title);
 		draw->AddText(
-			ImVec2(headerMin.x + 16.0f, headerMin.y + (headerHeight - titleSize.y) * 0.5f - 1.0f),
-			IM_COL32(242, 249, 249, 255),
+			ImVec2(headerMin.x + 18.0f * scale, headerMin.y + (headerHeight - titleSize.y) * 0.5f - 1.0f),
+			IM_COL32(255, 255, 255, 255),
 			Title);
 		const char *closeLabel = "X";
 		const auto closeLabelSize = ImGui::CalcTextSize(closeLabel);
 		draw->AddText(
 			ImVec2(closeMin.x + (closeWidth - closeLabelSize.x) * 0.5f, closeMin.y + (headerHeight - closeLabelSize.y) * 0.5f - 1.0f),
-			closeHovered ? IM_COL32(255, 255, 255, 255) : IM_COL32(188, 221, 223, 255),
+			IM_COL32(255, 255, 255, 255),
 			closeLabel);
 
 		if (!m_Visible)
 			return;
 
 		ImGui::SetCursorScreenPos(ImVec2(windowPosition.x, windowPosition.y + headerHeight));
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * scale, 16.0f * scale));
 		ImGui::BeginChild("##TrainerToolContent", ImVec2(0.0f, 0.0f), false);
 		ImGui::PopStyleVar();
 		m_ContentBegun = true;

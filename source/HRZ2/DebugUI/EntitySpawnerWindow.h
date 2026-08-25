@@ -38,6 +38,7 @@ namespace HRZ2::DebugUI
 
 		EntitySpawnerLoaderCallback m_LoaderCallback;
 		bool m_StreamerRequestPending = false;
+		bool m_ShowResourceIds = false;
 
 		static inline size_t m_LastSelectedSetupIndex = std::numeric_limits<size_t>::max();
 		static inline ImGuiTextFilter m_SpawnerNameFilter;
