@@ -40,8 +40,8 @@ namespace HRZ2::DebugUI
 		const float maximumY = std::max(screenMargin, displaySize.y - scaledDefaultSize.y - screenMargin);
 		const float toolWindowY = std::clamp(72.0f * scale, screenMargin, maximumY);
 
-		ImGui::SetNextWindowPos(ImVec2(toolWindowX, toolWindowY), ImGuiCond_Appearing);
-		ImGui::SetNextWindowSize(scaledDefaultSize, ImGuiCond_Appearing);
+		ImGui::SetNextWindowPos(ImVec2(toolWindowX, toolWindowY), ImGuiCond_Always);
+		ImGui::SetNextWindowSize(scaledDefaultSize, ImGuiCond_Always);
 		ImGui::SetNextWindowSizeConstraints(minimumSize, maximumSize);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
@@ -50,6 +50,7 @@ namespace HRZ2::DebugUI
 		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.95f, 0.72f, 0.28f, 1.00f));
 
 		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 		m_WindowBegun = true;
 		m_Visible = ImGui::Begin(Id, Open, flags);
@@ -76,16 +77,6 @@ namespace HRZ2::DebugUI
 			ImVec2(headerMin.x, headerMax.y - dividerHeight),
 			headerMax,
 			IM_COL32(226, 169, 60, 255));
-
-		ImGui::SetCursorScreenPos(headerMin);
-		ImGui::InvisibleButton("##TrainerToolDrag", ImVec2(std::max(1.0f, windowSize.x - closeWidth), headerHeight));
-		if (ImGui::IsItemHovered())
-			ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
-		if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
-		{
-			const auto delta = ImGui::GetIO().MouseDelta;
-			ImGui::SetWindowPos(ImVec2(windowPosition.x + delta.x, windowPosition.y + delta.y));
-		}
 
 		const ImVec2 closeMin(headerMax.x - closeWidth, headerMin.y);
 		ImGui::SetCursorScreenPos(closeMin);

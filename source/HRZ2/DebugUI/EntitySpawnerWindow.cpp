@@ -29,7 +29,6 @@ namespace HRZ2::DebugUI
 		if (!window)
 			return;
 
-		const float uiScale = GetTrainerUIScale();
 		static int spawnCount = 1;
 		static int spawnLocationType = 0;
 		static WorldPosition customSpawnPosition;
@@ -38,11 +37,9 @@ namespace HRZ2::DebugUI
 		const bool allowSpawn = m_LastSelectedSetupIndex < ModConfiguration.CachedSpawnSetups.size() && m_OutstandingSpawnCount == 0;
 		const auto availableSize = ImGui::GetContentRegionAvail();
 		const float paneSpacing = ImGui::GetStyle().ItemSpacing.x;
-		const float listPaneWidth = std::clamp(
-			availableSize.x * 0.56f,
-			360.0f * uiScale,
-			availableSize.x - 320.0f * uiScale - paneSpacing);
-		const float settingsPaneWidth = availableSize.x - listPaneWidth - paneSpacing;
+		const float paneWidth = (availableSize.x - paneSpacing) * 0.5f;
+		const float listPaneWidth = paneWidth;
+		const float settingsPaneWidth = paneWidth;
 		const ImGuiWindowFlags paneFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
 		ImGui::BeginChild("##EntityListPane", ImVec2(listPaneWidth, availableSize.y), false, paneFlags);
