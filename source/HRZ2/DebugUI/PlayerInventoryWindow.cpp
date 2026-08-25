@@ -82,7 +82,8 @@ namespace HRZ2::DebugUI
 		ImGui::SameLine();
 		ImGui::TextWrapped("生成、添加或删除任务物品可能永久破坏游戏进度。使用此工具前请新建存档，风险自负。");
 
-		m_NameFilter.Draw("筛选（包含,-排除）###InventoryFilter");
+		ImGui::TextUnformatted("筛选（包含、-排除）");
+		m_NameFilter.Draw("##InventoryFilter", -FLT_MIN);
 		ImGui::Checkbox("仅显示玩家物品栏中的物品###ShowOnlyPlayerInventoryItems", &m_FilterItemsInPlayerInventory);
 		ImGui::Checkbox("显示游戏本地化名称###ShowLocalizedNames", &m_ShowLocalizedItemNames);
 		ImGui::Checkbox("显示内部资源 ID（高级）###ShowInventoryResourceIds", &m_ShowResourceIds);

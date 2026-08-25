@@ -13,16 +13,34 @@ namespace HRZ2::DebugUI
 	{
 		const float scale = GetTrainerUIScale();
 		const auto displaySize = ImGui::GetIO().DisplaySize;
-		const ImVec2 maximumSize(
+		const float screenMargin = 16.0f * scale;
+		const float mainMenuWidth = std::min(600.0f * scale, displaySize.x - 36.0f * scale);
+		const float mainMenuX = std::max(
+			18.0f * scale,
+			std::min(34.0f * scale, displaySize.x - mainMenuWidth - 18.0f * scale));
+		const float preferredX = mainMenuX + mainMenuWidth + 24.0f * scale;
+		const float availableRightWidth = displaySize.x - preferredX - screenMargin;
+		const ImVec2 screenMaximumSize(
 			std::max(360.0f, displaySize.x - 32.0f * scale),
 			std::max(320.0f, displaySize.y - 32.0f * scale));
+		const float minimumWidth = std::min(900.0f * scale, screenMaximumSize.x);
+		const bool canPlaceBesideMainMenu = availableRightWidth >= minimumWidth;
+		const ImVec2 maximumSize(
+			canPlaceBesideMainMenu ? availableRightWidth : screenMaximumSize.x,
+			screenMaximumSize.y);
 		const ImVec2 minimumSize(
-			std::min(960.0f * scale, maximumSize.x),
+			std::min(minimumWidth, maximumSize.x),
 			std::min(950.0f * scale, maximumSize.y));
 		const ImVec2 scaledDefaultSize(
 			std::clamp(DefaultSize.x * scale, minimumSize.x, maximumSize.x),
 			std::clamp(DefaultSize.y * scale, minimumSize.y, maximumSize.y));
+		const float toolWindowX = canPlaceBesideMainMenu
+			? preferredX
+			: std::max(screenMargin, displaySize.x - scaledDefaultSize.x - screenMargin);
+		const float maximumY = std::max(screenMargin, displaySize.y - scaledDefaultSize.y - screenMargin);
+		const float toolWindowY = std::clamp(72.0f * scale, screenMargin, maximumY);
 
+		ImGui::SetNextWindowPos(ImVec2(toolWindowX, toolWindowY), ImGuiCond_Appearing);
 		ImGui::SetNextWindowSize(scaledDefaultSize, ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSizeConstraints(minimumSize, maximumSize);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
@@ -103,6 +121,8 @@ namespace HRZ2::DebugUI
 			ImVec2(0.0f, 0.0f),
 			false,
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+		ImGui::SetScrollX(0.0f);
+		ImGui::SetScrollY(0.0f);
 		ImGui::PopStyleVar();
 		m_ContentBegun = true;
 	}

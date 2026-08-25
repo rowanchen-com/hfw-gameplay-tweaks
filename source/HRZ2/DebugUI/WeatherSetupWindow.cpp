@@ -60,10 +60,15 @@ namespace HRZ2::DebugUI
 
 		// Draw weather setup list
 		const float uiScale = GetTrainerUIScale();
-		m_SpawnerNameFilter.Draw("筛选（包含,-排除）###WeatherSetupFilter");
+		ImGui::TextUnformatted("筛选（包含、-排除）");
+		m_SpawnerNameFilter.Draw("##WeatherSetupFilter", -FLT_MIN);
 		ImGui::Checkbox("显示内部资源 ID（高级）###ShowWeatherResourceIds", &m_ShowResourceIds);
+		const float footerHeight = ImGui::GetFrameHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing() * 3.0f;
+		const float listHeight = std::max(
+			ImGui::GetFrameHeightWithSpacing() * 4.0f,
+			ImGui::GetContentRegionAvail().y - footerHeight);
 
-		if (ImGui::BeginListBox("##WeatherSetupSelector", ImVec2(-FLT_MIN, -180.0f * uiScale)))
+		if (ImGui::BeginListBox("##WeatherSetupSelector", ImVec2(-FLT_MIN, listHeight)))
 		{
 			for (size_t i = 0; i < ModConfiguration.CachedWeatherSetups.size(); i++)
 			{
@@ -140,11 +145,13 @@ namespace HRZ2::DebugUI
 			}
 		}
 
+		ImGui::EndDisabled();
 		ImGui::Spacing();
+		const float warningStartY = ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y - ImGui::GetTextLineHeightWithSpacing() * 2.0f;
+		ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), warningStartY));
 		ImGui::PushTextWrapPos(0.0f);
 		ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.38f, 1.0f), "注意：部分名称缺失，可以在模组配置文件中手动添加。");
 		ImGui::PopTextWrapPos();
-		ImGui::EndDisabled();
 
 		m_DoSetOnNextFrame = false;
 	}
