@@ -519,6 +519,14 @@ namespace HRZ2::DebugUI
 		{
 		case WM_KEYDOWN:
 		{
+			// The grave/tilde key can report different virtual-key codes under different
+			// keyboard layouts and IMEs. When noclip keeps its default VK_OEM_3 binding,
+			// normalize the physical key (scan code 0x29) before dispatching hotkeys.
+			constexpr UINT GraveTildeScanCode = 0x29;
+			const auto scanCode = static_cast<UINT>((static_cast<ULONG_PTR>(lParam) >> 16) & 0xFF);
+			if (ModConfiguration.Hotkeys.ToggleNoclip == VK_OEM_3 && scanCode == GraveTildeScanCode)
+				wParam = VK_OEM_3;
+
 			if (ModConfiguration.Hotkeys.ToggleDebugUI == VK_OEM_3 && wParam == VK_OEM_8)
 				wParam = VK_OEM_3; // Workaround for UK keyboard layouts
 

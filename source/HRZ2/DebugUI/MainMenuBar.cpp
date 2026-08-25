@@ -211,7 +211,7 @@ namespace HRZ2::DebugUI
 			auto debugSettings = DebugSettings::GetInstance();
 			const bool debugAvailable = debugSettings != nullptr;
 
-			addToggle("穿墙模式", "让埃洛伊脱离碰撞并使用自由移动。", m_FreeCamMode == FreeCamMode::Noclip, [](bool Enabled)
+			addToggle("穿墙模式（丶 / ~ 快捷开启关闭）", "让埃洛伊脱离碰撞并使用自由移动。", m_FreeCamMode == FreeCamMode::Noclip, [](bool Enabled)
 			{
 				if ((m_FreeCamMode == FreeCamMode::Noclip) != Enabled) ToggleNoclip();
 			}, playerAvailable);
@@ -449,13 +449,15 @@ namespace HRZ2::DebugUI
 
 		if (IsNavigationKeyPressed(ImGuiKey_UpArrow, ImGuiKey_W))
 		{
-			state.SelectedIndex = state.SelectedIndex == 0 ? Items.size() - 1 : state.SelectedIndex - 1;
+			if (state.SelectedIndex > 0)
+				state.SelectedIndex--;
 			return false;
 		}
 
 		if (IsNavigationKeyPressed(ImGuiKey_DownArrow, ImGuiKey_S))
 		{
-			state.SelectedIndex = (state.SelectedIndex + 1) % Items.size();
+			if (state.SelectedIndex + 1 < Items.size())
+				state.SelectedIndex++;
 			return false;
 		}
 
@@ -570,9 +572,14 @@ namespace HRZ2::DebugUI
 			if (ImGui::IsWindowHovered() && io.MouseWheel != 0.0f)
 			{
 				if (io.MouseWheel > 0.0f)
-					state.SelectedIndex = state.SelectedIndex == 0 ? Items.size() - 1 : state.SelectedIndex - 1;
-				else
-					state.SelectedIndex = (state.SelectedIndex + 1) % Items.size();
+				{
+					if (state.SelectedIndex > 0)
+						state.SelectedIndex--;
+				}
+				else if (state.SelectedIndex + 1 < Items.size())
+				{
+					state.SelectedIndex++;
+				}
 
 				if (state.SelectedIndex < state.ScrollOffset)
 					state.ScrollOffset = state.SelectedIndex;
@@ -580,6 +587,9 @@ namespace HRZ2::DebugUI
 					state.ScrollOffset = state.SelectedIndex - visibleRows + 1;
 			}
 
+			const bool pointerMoved = io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f;
+			const bool pointerClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+			const bool allowPointerSelection = io.MouseWheel == 0.0f && (pointerMoved || pointerClicked);
 			for (size_t visibleIndex = 0; visibleIndex < visibleRows; visibleIndex++)
 			{
 				const size_t itemIndex = state.ScrollOffset + visibleIndex;
@@ -591,7 +601,7 @@ namespace HRZ2::DebugUI
 				ImGui::PushID(static_cast<int>(itemIndex));
 				ImGui::InvisibleButton("##TrainerRow", ImVec2(width, rowHeight));
 				const bool hovered = ImGui::IsItemHovered();
-				if (hovered)
+				if (hovered && allowPointerSelection)
 					state.SelectedIndex = itemIndex;
 
 				const bool selected = state.SelectedIndex == itemIndex;
