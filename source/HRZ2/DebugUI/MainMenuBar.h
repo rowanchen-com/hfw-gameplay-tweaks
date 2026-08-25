@@ -59,13 +59,9 @@ namespace HRZ2::DebugUI
 		{
 			Home,
 			Player,
-			Combat,
-			Survival,
 			Resources,
 			World,
 			Teleport,
-			Faction,
-			Utilities,
 			Developer,
 			ConfirmExit,
 		};

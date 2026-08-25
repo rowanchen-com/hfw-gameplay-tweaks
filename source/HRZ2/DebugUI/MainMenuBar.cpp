@@ -3,7 +3,6 @@
 #include <cmath>
 #include <format>
 #include <limits>
-#include <shared_mutex>
 #include <utility>
 #include <imgui.h>
 #include <Windows.h>
@@ -78,6 +77,7 @@ namespace HRZ2::DebugUI
 		m_EnableGodMode = ModConfiguration.EnableGodMode;
 		m_EnableInfiniteClipAmmo = ModConfiguration.EnableInfiniteClipAmmo;
 		m_EnableAutoNeutralFaction = ModConfiguration.EnableAutoNeutralFaction;
+		TrainerCheats::SetEnabled(TrainerCheats::Feature::IgnoreHits, m_EnableGodMode);
 	}
 
 	void MainMenuBar::Render()
@@ -197,18 +197,13 @@ namespace HRZ2::DebugUI
 		switch (currentPage)
 		{
 		case Page::Home:
-			addSubmenu("玩家选项", "自由镜头、穿墙、原有引擎无敌、弹药和玩家状态。", Page::Player, playerAvailable);
-			addSubmenu("战斗强化", "无视命中、生命、伤害、弹药与弓箭相关功能。", Page::Combat, playerAvailable);
-			addSubmenu("生存与技能", "专注、勇气、氧气、技能持续时间及潜行功能。", Page::Survival, playerAvailable);
-			addSubmenu("资源与成长", "物品数量、制作、经验与技能点功能。", Page::Resources, playerAvailable);
-			addSubmenu("世界与时间", "控制游戏暂停、昼夜时间、时间倍率和显示距离。", Page::World);
-			addSubmenu("传送", "将玩家传送到预设坐标或自由镜头位置。", Page::Teleport, playerAvailable);
-			addSubmenu("玩家阵营", "切换玩家使用的游戏内部 AI 阵营。", Page::Faction, playerAvailable);
-			addToolWindow("玩家物品栏", "打开物品管理窗口；操作任务物品前请先备份存档。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
-			addToolWindow("实体生成器", "打开实体生成窗口，可生成机器、动物和其他实体。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
-			addToolWindow("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
-			addSubmenu("实用工具", "保存、读取和菜单控制。", Page::Utilities);
+			addSubmenu("玩家功能", "移动、战斗、生存、弹药、技能和玩家状态。", Page::Player, playerAvailable);
+			addSubmenu("资源与成长", "物品栏、数量修改、制作、经验与技能点。", Page::Resources, playerAvailable);
+			addSubmenu("世界与传送", "世界时间、游戏速度、传送、实体与天气。", Page::World);
+			addAction("强制快速保存", "立即请求一次快速保存。", []() { ToggleQuickSave(); }, playerAvailable);
+			addAction("读取上一存档", "立即读取最近一次存档。", []() { ToggleQuickLoad(); }, playerAvailable);
 			addSubmenu("开发者工具", "日志、RTTI 导出和调试功能。", Page::Developer);
+			addSubmenu("结束游戏", "显示确认页面后终止当前游戏进程。", Page::ConfirmExit);
 			break;
 
 		case Page::Player:
@@ -224,8 +219,9 @@ namespace HRZ2::DebugUI
 			{
 				if ((m_FreeCamMode == FreeCamMode::Free) != Enabled) ToggleFreeflyCamera();
 			}, playerAvailable);
-			addToggle("无敌模式", "免疫伤害，同时保留正常生命值逻辑。", m_EnableGodMode, [](bool Enabled)
+			addToggle("完全无敌", "合并引擎无敌与无视命中判定；特征码不可用时仍保留引擎无敌。", m_EnableGodMode, [](bool Enabled)
 			{
+				TrainerCheats::SetEnabled(TrainerCheats::Feature::IgnoreHits, Enabled);
 				if (auto p = Player::GetLocalPlayer(); p && p->m_Entity && p->m_Entity->m_Destructibility)
 				{
 					auto d = p->m_Entity->m_Destructibility;
@@ -237,6 +233,7 @@ namespace HRZ2::DebugUI
 			}, playerAvailable);
 			addToggle("半无敌模式", "仍会受到伤害，但生命值降至零时不会死亡。", m_EnableDemigodMode, [](bool Enabled)
 			{
+				if (Enabled) TrainerCheats::SetEnabled(TrainerCheats::Feature::IgnoreHits, false);
 				if (auto p = Player::GetLocalPlayer(); p && p->m_Entity && p->m_Entity->m_Destructibility)
 				{
 					auto d = p->m_Entity->m_Destructibility;
@@ -267,7 +264,25 @@ namespace HRZ2::DebugUI
 			{
 				if (auto s = DebugSettings::GetInstance()) s->m_Inexhaustible = Enabled;
 			}, debugAvailable);
-			addToggle("自动中立阵营", "持续将玩家阵营设置为中立；手动选阵营会关闭此项。", m_EnableAutoNeutralFaction,
+			addFeatureToggle("无限专注", "持续恢复武器轮盘与瞄准使用的专注值。", TrainerCheats::Feature::InfiniteFocus);
+			addFeatureToggle("无限勇气", "持续补充勇气激增所需的勇气值。", TrainerCheats::Feature::InfiniteValor);
+			addFeatureToggle("无限技能持续时间", "冻结受支持技能的剩余持续时间。", TrainerCheats::Feature::InfiniteSkillDuration);
+			addFeatureToggle("无限氧气", "水下活动时不再消耗氧气。", TrainerCheats::Feature::InfiniteOxygen);
+			addFeatureToggle("药用浆果袋保持满额", "消耗药用浆果后立即恢复到当前容量。", TrainerCheats::Feature::MaxMedicinePouch);
+			addFeatureToggle("弓箭瞬间蓄力", "拉弓时立即达到完整蓄力。", TrainerCheats::Feature::InstantBowCharge);
+			addFeatureToggle("超级伤害 / 一击必杀", "把对敌人的有效伤害提高到极高数值；部分特殊目标可能仍有剧情保护。",
+				TrainerCheats::Feature::SuperDamage);
+			addValueEditor("伤害倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DamageMultiplier)
+				? std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()) : "关闭",
+				"打开数字窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DamageMultiplier,
+				TrainerCheats::Feature::DamageMultiplier);
+			addValueEditor("防御倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DefenseMultiplier)
+				? std::format("{:.1f}x", TrainerCheats::GetDefenseMultiplier()) : "关闭",
+				"打开数字窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DefenseMultiplier,
+				TrainerCheats::Feature::DefenseMultiplier);
+			addFeatureToggle("隐身模式", "同时关闭相关 AI 发现分支并持续清除警觉状态。", TrainerCheats::Feature::StealthMode);
+			addFeatureToggle("锁定试炼时间", "冻结狩猎场等受支持试炼的计时器。", TrainerCheats::Feature::FreezeTrialTimer);
+			addToggle("自动中立阵营", "持续将玩家阵营恢复为中立。", m_EnableAutoNeutralFaction,
 				[](bool Enabled) { m_EnableAutoNeutralFaction = Enabled; }, playerAvailable);
 			addToggle("模拟游戏已完成", "解锁依赖通关状态的调试内容。", debugAvailable && debugSettings->m_SPAllUnlocked, [](bool Enabled)
 			{
@@ -281,39 +296,10 @@ namespace HRZ2::DebugUI
 			break;
 		}
 
-		case Page::Combat:
-		{
-			addFeatureToggle("无视命中判定", "让针对玩家的伤害命中判定直接失效；与原有引擎无敌是两套独立实现。",
-				TrainerCheats::Feature::IgnoreHits);
-			addFeatureToggle("无限生命", "持续将玩家生命值保持为 9999。", TrainerCheats::Feature::InfiniteHealth);
-			addFeatureToggle("超级伤害 / 一击必杀", "把对敌人的有效伤害提高到极高数值；部分特殊目标可能仍有剧情保护。",
-				TrainerCheats::Feature::SuperDamage);
-			addValueEditor("伤害倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DamageMultiplier)
-				? std::format("{:.1f}x", TrainerCheats::GetDamageMultiplier()) : "关闭",
-				"打开二级窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DamageMultiplier,
-				TrainerCheats::Feature::DamageMultiplier);
-			addValueEditor("防御倍率设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::DefenseMultiplier)
-				? std::format("{:.1f}x", TrainerCheats::GetDefenseMultiplier()) : "关闭",
-				"打开二级窗口输入倍率；只有确认后才启用。", TrainerValueEditorWindow::Mode::DefenseMultiplier,
-				TrainerCheats::Feature::DefenseMultiplier);
-			addFeatureToggle("无限箭矢与陷阱", "使用箭矢或陷阱时把当前计数保持为 99。",
-				TrainerCheats::Feature::InfiniteArrowsAndTraps);
-			addFeatureToggle("弓箭瞬间蓄力", "拉弓时立即达到完整蓄力。", TrainerCheats::Feature::InstantBowCharge);
-			break;
-		}
-
-		case Page::Survival:
-			addFeatureToggle("无限专注", "持续恢复武器轮盘与瞄准使用的专注值。", TrainerCheats::Feature::InfiniteFocus);
-			addFeatureToggle("无限勇气", "持续补充勇气激增所需的勇气值。", TrainerCheats::Feature::InfiniteValor);
-			addFeatureToggle("无限技能持续时间", "冻结受支持技能的剩余持续时间。", TrainerCheats::Feature::InfiniteSkillDuration);
-			addFeatureToggle("无限氧气", "水下活动时不再消耗氧气。", TrainerCheats::Feature::InfiniteOxygen);
-			addFeatureToggle("药用浆果袋保持满额", "消耗药用浆果后立即恢复到当前容量。", TrainerCheats::Feature::MaxMedicinePouch);
-			addFeatureToggle("隐身模式", "同时关闭相关 AI 发现分支并持续清除警觉状态。", TrainerCheats::Feature::StealthMode);
-			addFeatureToggle("锁定试炼时间", "冻结狩猎场等受支持试炼的计时器。", TrainerCheats::Feature::FreezeTrialTimer);
-			break;
-
 		case Page::Resources:
 		{
+			addToolWindow("玩家物品栏", "打开物品管理窗口；操作任务物品前请先备份存档。",
+				[]() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
 			const auto addItemEditor = [&](const char *Name, TrainerCheats::Feature FeatureValue,
 				TrainerValueEditorWindow::Mode EditorMode)
 			{
@@ -391,10 +377,7 @@ namespace HRZ2::DebugUI
 			addValue("LOD 偏差", lodEnabled ? std::format("{:.2f}", m_LODRangeModifier) : "未启用", "使用左右键调整 LOD 距离倍率。",
 				[]() { if (m_LODRangeModifier != std::numeric_limits<float>::max()) m_LODRangeModifier = std::clamp(m_LODRangeModifier - 0.05f, 0.0f, 1.0f); },
 				[]() { if (m_LODRangeModifier != std::numeric_limits<float>::max()) m_LODRangeModifier = std::clamp(m_LODRangeModifier + 0.05f, 0.0f, 1.0f); }, lodEnabled);
-			break;
-		}
 
-		case Page::Teleport:
 			addAction("保存当前位置", "记录玩家当前世界坐标；仅保存在本次游戏进程中。", []()
 			{
 				if (auto p = Player::GetLocalPlayer(); p && p->m_Entity)
@@ -418,56 +401,17 @@ namespace HRZ2::DebugUI
 			}
 			addAction("自由镜头位置", std::format("坐标：{:.1f}, {:.1f}, {:.1f}", m_FreeCamPosition.Position.X,
 				m_FreeCamPosition.Position.Y, m_FreeCamPosition.Position.Z), []() { TeleportTo(m_FreeCamPosition.Position); }, playerAvailable);
-			for (const auto& location : TeleportLocations)
-				addAction(location.Name, std::format("坐标：{:.1f}, {:.1f}, {:.1f}", location.Position.X, location.Position.Y, location.Position.Z),
-					[position = location.Position]() { TeleportTo(position); }, playerAvailable);
-			break;
-
-		case Page::Faction:
-		{
-			addToggle("自动中立阵营", "持续把玩家恢复为中立阵营。", m_EnableAutoNeutralFaction,
-				[](bool Enabled) { m_EnableAutoNeutralFaction = Enabled; }, playerAvailable);
-			struct FactionEntry { std::string Name; Ref<RTTIRefObject> Object; };
-			std::vector<FactionEntry> factions;
-			auto& events = ModCoreEvents::GetInstance();
-			{
-				std::shared_lock lock(events.m_CachedDataMutex);
-				factions.reserve(events.m_CachedAIFactions.size());
-				for (auto faction : events.m_CachedAIFactions)
-				{
-					const auto name = faction->GetMemberRefUnsafe<String>("Name");
-					factions.emplace_back(FactionEntry { std::string(name.data(), name.size()), faction });
-				}
-			}
-			std::ranges::sort(factions, {}, &FactionEntry::Name);
-			auto currentFaction = playerAvailable ? reinterpret_cast<RTTIRefObject *>(player->m_Entity->m_Faction) : nullptr;
-			for (const auto& faction : factions)
-			{
-				items.emplace_back(MenuItem {
-					.Label = faction.Name, .Value = faction.Object.GetPtr() == currentFaction ? "当前" : "",
-					.Description = "游戏内部阵营标识；保持英文可避免资源名称歧义。", .Enabled = playerAvailable,
-					.Activate = [factionRef = faction.Object]()
-					{
-						m_EnableAutoNeutralFaction = false;
-						JobHeaderCPU::SubmitCallable([factionRef]()
-						{
-							if (auto p = Player::GetLocalPlayer(); p && p->m_Entity)
-								p->m_Entity->SetFaction(reinterpret_cast<AIFaction *>(factionRef.GetPtr()));
-						});
-					},
-				});
-			}
+			addSubmenu("预设地点", "打开内置坐标列表。", Page::Teleport, playerAvailable);
+			addToolWindow("实体生成器", "打开实体生成窗口，可生成机器、动物和其他实体。",
+				[]() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
+			addToolWindow("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
 			break;
 		}
 
-		case Page::Utilities:
-			addAction("强制快速保存", "立即请求一次快速保存。", []() { ToggleQuickSave(); }, playerAvailable);
-			addAction("读取上一存档", "立即读取最近一次存档。", []() { ToggleQuickLoad(); }, playerAvailable);
-			addToolWindow("玩家物品栏", "打开物品管理窗口。", []() { AddWindow(std::make_shared<PlayerInventoryWindow>()); }, playerAvailable);
-			addToolWindow("实体生成器", "打开实体生成窗口。", []() { AddWindow(std::make_shared<EntitySpawnerWindow>()); }, playerAvailable);
-			addToolWindow("天气设置", "打开天气资源选择窗口。", []() { AddWindow(std::make_shared<WeatherSetupWindow>()); });
-			addAction("关闭修改器菜单", "关闭菜单并恢复游戏输入。", []() { SetMenuVisible(false); });
-			addSubmenu("结束游戏", "显示确认页面后终止当前游戏进程。", Page::ConfirmExit);
+		case Page::Teleport:
+			for (const auto& location : TeleportLocations)
+				addAction(location.Name, std::format("坐标：{:.1f}, {:.1f}, {:.1f}", location.Position.X, location.Position.Y, location.Position.Z),
+					[position = location.Position]() { TeleportTo(position); }, playerAvailable);
 			break;
 
 		case Page::Developer:
@@ -732,14 +676,10 @@ namespace HRZ2::DebugUI
 		switch (m_Navigation.back().PageId)
 		{
 		case Page::Home: return "主菜单";
-		case Page::Player: return "玩家选项";
-		case Page::Combat: return "战斗强化";
-		case Page::Survival: return "生存与技能";
+		case Page::Player: return "玩家功能";
 		case Page::Resources: return "资源与成长";
-		case Page::World: return "世界与时间";
-		case Page::Teleport: return "传送";
-		case Page::Faction: return "玩家阵营";
-		case Page::Utilities: return "实用工具";
+		case Page::World: return "世界与传送";
+		case Page::Teleport: return "预设地点";
 		case Page::Developer: return "开发者工具";
 		case Page::ConfirmExit: return "确认结束游戏";
 		}

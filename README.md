@@ -9,6 +9,7 @@ Source code for the Horizon Forbidden West mod, with a complete Simplified Chine
 - Includes localized `mod_config.ini` and `mod_DamageSettings.ini` resources without changing the original cheat defaults.
 - Uses the Microsoft YaHei Bold font (`C:/Windows/Fonts/msyhbd.ttc`) at a large resolution-aware size by default. `DebugMenuFontPath`, `DebugMenuFontSize`, and `DebugMenuFontScale` can be changed under `[General]`.
 - Replaces the narrow menu bar with a GTA-style interaction menu using hierarchical pages, keyboard navigation, mouse support, descriptions, and page counters.
+- Consolidates normal controls into Player, Resources, and World categories; duplicate combat, survival, faction, and utility pages are no longer shown.
 - Uses the Windows hardware cursor by default so the pointer remains smooth when frame generation is enabled. Set `DebugMenuUseHardwareCursor = false` to restore Dear ImGui's software cursor.
 
 ## Menu controls
@@ -20,9 +21,9 @@ Source code for the Horizon Forbidden West mod, with a complete Simplified Chine
 
 ## Integrated trainer features
 
-- Combat: ignore hit checks, infinite health, infinite focus/valor/skill duration/oxygen, maximum medicine, infinite arrows and traps, instant bow charge, super damage, damage multiplier, and defense multiplier.
+- Player: complete god mode combines the engine invulnerability and ignore-hit implementations, alongside movement, ammo, combat, focus/valor/skill duration/oxygen, medicine, stealth, trial timer, instant bow charge, super damage, damage multiplier, and defense multiplier controls.
 - Resources and progression: runtime crafting/purchase bypass, configurable tool/ammo/resource stack values, experience multiplier, experience grant, and skill-point editing.
-- World and movement: stealth mode, trial-timer freeze, the existing engine timescale control, save location, teleport, undo teleport, and teleport to the active map waypoint.
+- World and movement: pause and time controls, the existing engine timescale and LOD controls, save location, teleport, undo teleport, the active map waypoint, preset locations, entity spawning, and weather.
 - Existing engine-backed god mode, ammo, free camera, noclip, inventory editor, entity spawner, weather, and world tools remain available. All newly integrated trainer toggles default to off.
 - Trainer signatures are optional and version-aware: a missing signature disables only its matching menu item instead of preventing the DLL from loading.
 
