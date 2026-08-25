@@ -26,6 +26,7 @@ namespace
 	constexpr float MinimumValorValue = 100.0f;
 	constexpr float FullBowChargeValue = 100.0f;
 	constexpr float OneValue = 1.0f;
+	constexpr uint32_t InfiniteJumpBypassUpdates = 18;
 
 	std::array<std::atomic_uint32_t, FeatureCount> g_enabled {};
 	std::array<std::atomic_bool, FeatureCount> g_available {};
@@ -35,9 +36,8 @@ namespace
 	std::atomic<float> g_damageMultiplier = 2.0f;
 	std::atomic<float> g_defenseMultiplier = 2.0f;
 	std::atomic<float> g_experienceMultiplier = 2.0f;
-	std::atomic<float> g_infiniteJumpVelocity = 12.0f;
-	std::atomic_uint32_t g_infiniteJumpRequested = 0;
-	std::atomic_uint32_t g_infiniteJumpVelocityPending = 0;
+	std::atomic<float> g_infiniteJumpHeightMultiplier = 10.0f;
+	std::atomic_uint32_t g_infiniteJumpBypassUpdates = 0;
 	std::atomic_uint32_t g_toolsAmount = 0;
 	std::atomic_uint32_t g_ammoAmount = 0;
 	std::atomic_uint32_t g_resourcesAmount = 0;
@@ -410,10 +410,7 @@ namespace HRZ2::TrainerCheats
 		case Feature::EditSkillPoints: if (!Enabled) g_applySkillPoints.store(0); break;
 		case Feature::InfiniteJump:
 			if (!Enabled)
-			{
-				g_infiniteJumpRequested.store(0);
-				g_infiniteJumpVelocityPending.store(0);
-			}
+				g_infiniteJumpBypassUpdates.store(0);
 			break;
 		default: break;
 		}
@@ -426,12 +423,12 @@ namespace HRZ2::TrainerCheats
 	void SetDefenseMultiplier(float Value) { g_defenseMultiplier.store(std::clamp(Value, 1.0f, 100.0f)); }
 	float GetExperienceMultiplier() { return g_experienceMultiplier.load(); }
 	void SetExperienceMultiplier(float Value) { g_experienceMultiplier.store(std::clamp(Value, 1.0f, 100.0f)); }
-	float GetInfiniteJumpVelocity() { return g_infiniteJumpVelocity.load(); }
-	void SetInfiniteJumpVelocity(float Value) { g_infiniteJumpVelocity.store(std::clamp(Value, 1.0f, 50.0f)); }
+	float GetInfiniteJumpHeightMultiplier() { return g_infiniteJumpHeightMultiplier.load(); }
+	void SetInfiniteJumpHeightMultiplier(float Value) { g_infiniteJumpHeightMultiplier.store(std::clamp(Value, 1.0f, 50.0f)); }
 	void RequestInfiniteJump()
 	{
 		if (IsAvailable(Feature::InfiniteJump) && IsEnabled(Feature::InfiniteJump))
-			g_infiniteJumpRequested.store(1, std::memory_order_release);
+			g_infiniteJumpBypassUpdates.store(InfiniteJumpBypassUpdates, std::memory_order_release);
 	}
 
 	uint32_t GetItemAmount(Feature Value)
@@ -553,7 +550,7 @@ namespace
 		SetAvailability(Feature::InfiniteArrowsAndTraps, arrowsAvailable);
 
 		// The working CT bypasses this airborne-state comparison permanently, which also changes
-		// falling behavior. Bypass it for only one update after a fresh Space press instead.
+		// falling behavior. Keep the bypass alive only briefly after a fresh Space press.
 		const auto infiniteJumpState = FindPattern("80 BB 50 01 00 00 00 0F B6");
 		const bool infiniteJumpStateAvailable = InstallMidHook("InfiniteJumpState", infiniteJumpState, 7,
 			[](Xbyak::CodeGenerator& code)
@@ -564,13 +561,12 @@ namespace
 			code.mov(r11, FlagAddress(Feature::InfiniteJump));
 			code.cmp(dword[r11], 0);
 			code.je(original);
-			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_infiniteJumpRequested));
-			code.xor_(eax, eax);
-			code.xchg(dword[r11], eax);
+			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_infiniteJumpBypassUpdates));
+			code.mov(eax, dword[r11]);
 			code.test(eax, eax);
-			code.je(original);
-			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_infiniteJumpVelocityPending));
-			code.mov(dword[r11], 1);
+			code.jle(original);
+			code.dec(eax);
+			code.mov(dword[r11], eax);
 			code.pop(r11);
 			code.pop(rax);
 			code.cmp(byte[rbx + 0x150], 1);
@@ -583,38 +579,30 @@ namespace
 			code.L(complete);
 		});
 
-		// After the one-update state bypass has allowed a real jump, replace only that jump's
-		// upward velocity. All following stores remain untouched, preserving vanilla gravity.
-		const auto infiniteJumpVelocity = FindPattern("C5 FA 11 8F 80 01 00 00 48");
-		const bool infiniteJumpVelocityAvailable = InstallMidHook("InfiniteJumpVelocity", infiniteJumpVelocity, 8,
+		// Port the CT's verified high-jump path, but leave its horizontal speed multiplier out.
+		// The Z component is multiplied at the game's motion-vector write; fall physics is untouched.
+		const auto infiniteJumpHeight = FindPattern("C5 F8 11 87 60 01 00 00 48 8B 8F");
+		const bool infiniteJumpHeightAvailable = InstallMidHook("InfiniteJumpHeight", infiniteJumpHeight, 8,
 			[](Xbyak::CodeGenerator& code)
 		{
 			Xbyak::Label original;
-			EmitOriginal(code, { 0xC5, 0xFA, 0x11, 0x8F, 0x80, 0x01, 0x00, 0x00 });
+			EmitOriginal(code, { 0xC5, 0xF8, 0x11, 0x87, 0x60, 0x01, 0x00, 0x00 });
+			EmitFlagCheck(code, Feature::InfiniteJump, original);
 			code.pushfq();
-			code.push(rax);
 			code.push(r11);
-			// Do not consume the pending override while the player is still stationary or falling.
-			// Wait until the game's accepted jump has produced a positive upward velocity.
-			code.mov(eax, dword[rdi + 0x180]);
-			code.test(eax, 0x80000000);
-			code.jnz(original);
-			code.test(eax, 0x7FFFFFFF);
-			code.jz(original);
-			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_infiniteJumpVelocityPending));
-			code.xor_(eax, eax);
-			code.xchg(dword[r11], eax);
-			code.test(eax, eax);
-			code.je(original);
-			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_infiniteJumpVelocity));
-			code.mov(eax, dword[r11]);
-			code.mov(dword[rdi + 0x180], eax);
-			code.L(original);
+			code.sub(rsp, 0x10);
+			code.movdqu(ptr[rsp], xmm15);
+			code.movss(xmm15, dword[rdi + 0x168]);
+			code.mov(r11, reinterpret_cast<std::uintptr_t>(&g_infiniteJumpHeightMultiplier));
+			code.mulss(xmm15, dword[r11]);
+			code.movss(dword[rdi + 0x168], xmm15);
+			code.movdqu(xmm15, ptr[rsp]);
+			code.add(rsp, 0x10);
 			code.pop(r11);
-			code.pop(rax);
 			code.popfq();
+			code.L(original);
 		});
-		SetAvailability(Feature::InfiniteJump, infiniteJumpStateAvailable && infiniteJumpVelocityAvailable);
+		SetAvailability(Feature::InfiniteJump, infiniteJumpStateAvailable && infiniteJumpHeightAvailable);
 
 		const auto ignoreHits = FindPattern("48 8B F9 A9 00 00 00 A0 0F 85 ? ? 00 00");
 		const bool ignoreHitsAvailable = InstallMidHook("IgnoreHits", ignoreHits, 8, [](Xbyak::CodeGenerator& code)

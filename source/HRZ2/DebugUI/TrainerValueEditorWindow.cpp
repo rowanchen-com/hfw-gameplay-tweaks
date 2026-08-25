@@ -47,7 +47,7 @@ namespace HRZ2::DebugUI
 		case Mode::DamageMultiplier: m_FloatValue = TrainerCheats::GetDamageMultiplier(); break;
 		case Mode::DefenseMultiplier: m_FloatValue = TrainerCheats::GetDefenseMultiplier(); break;
 		case Mode::ExperienceMultiplier: m_FloatValue = TrainerCheats::GetExperienceMultiplier(); break;
-		case Mode::InfiniteJump: m_FloatValue = TrainerCheats::GetInfiniteJumpVelocity(); break;
+		case Mode::InfiniteJump: m_FloatValue = TrainerCheats::GetInfiniteJumpHeightMultiplier(); break;
 		case Mode::ToolsAmount:
 		case Mode::AmmoAmount:
 		case Mode::ResourcesAmount:
@@ -78,7 +78,7 @@ namespace HRZ2::DebugUI
 	const char *TrainerValueEditorWindow::GetExplanation() const
 	{
 		if (m_Mode == Mode::InfiniteJump)
-			return "输入每次重新按下空格时施加的向上力度。默认 12，数值越大跳得越高；这不是米数。起跳后立即恢复游戏原版重力和下降速度。";
+			return "输入跳跃高度倍率。1 为原版，默认 10；数值越大跳得越高。这里只修改 CT 中的高度分量，不启用慢速下降。";
 		if (IsMultiplier())
 			return "输入倍率并确认后才会启用。关闭倍率会恢复游戏的正常计算。";
 		if (m_Mode == Mode::SkillPoints)
@@ -109,9 +109,9 @@ namespace HRZ2::DebugUI
 		if (m_Mode == Mode::InfiniteJump)
 		{
 			m_FloatValue = std::clamp(m_FloatValue, 1.0f, 50.0f);
-			TrainerCheats::SetInfiniteJumpVelocity(m_FloatValue);
+			TrainerCheats::SetInfiniteJumpHeightMultiplier(m_FloatValue);
 			TrainerCheats::SetEnabled(feature, true);
-			m_Status = std::format("无限跳已启用：向上力度 {:.2f}。松开并重新按下空格即可再次起跳。", m_FloatValue);
+			m_Status = std::format("无限跳已启用：高度 {:.2f} 倍。松开并重新按下空格即可再次起跳。", m_FloatValue);
 			return;
 		}
 
@@ -208,7 +208,7 @@ namespace HRZ2::DebugUI
 			ImGui::BeginGroup();
 			ImGui::TextWrapped("%s", GetExplanation());
 			ImGui::Spacing();
-			ImGui::TextUnformatted(m_Mode == Mode::InfiniteJump ? "向上力度（1 - 50）" :
+			ImGui::TextUnformatted(m_Mode == Mode::InfiniteJump ? "跳跃高度倍率（1 - 50）" :
 				(IsMultiplier() ? "输入倍率" : "输入数量"));
 			ImGui::SetNextItemWidth(width - 40.0f * scale);
 			if (m_RequestKeyboardFocus)

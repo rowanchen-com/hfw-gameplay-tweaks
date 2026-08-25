@@ -220,8 +220,8 @@ namespace HRZ2::DebugUI
 				if ((m_FreeCamMode == FreeCamMode::Free) != Enabled) ToggleFreeflyCamera();
 			}, playerAvailable);
 			addValueEditor("无限跳高度设置", TrainerCheats::IsEnabled(TrainerCheats::Feature::InfiniteJump)
-				? std::format("{:.1f}", TrainerCheats::GetInfiniteJumpVelocity()) : "关闭",
-				"启用后松开并重新按下空格可在空中再次起跳；只改变向上力度，下降保持原版速度。",
+				? std::format("{:.1f}x", TrainerCheats::GetInfiniteJumpHeightMultiplier()) : "关闭",
+				"启用后松开并重新按下空格可在空中再次起跳；高度使用 CT 的运动倍率路径，下降保持原版速度。",
 				TrainerValueEditorWindow::Mode::InfiniteJump, TrainerCheats::Feature::InfiniteJump);
 			addToggle("完全无敌", "合并引擎无敌与无视命中判定；特征码不可用时仍保留引擎无敌。", m_EnableGodMode, [](bool Enabled)
 			{

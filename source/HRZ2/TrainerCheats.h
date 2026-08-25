@@ -53,8 +53,8 @@ namespace HRZ2
 		void SetDefenseMultiplier(float Value);
 		float GetExperienceMultiplier();
 		void SetExperienceMultiplier(float Value);
-		float GetInfiniteJumpVelocity();
-		void SetInfiniteJumpVelocity(float Value);
+		float GetInfiniteJumpHeightMultiplier();
+		void SetInfiniteJumpHeightMultiplier(float Value);
 		void RequestInfiniteJump();
 
 		uint32_t GetItemAmount(Feature Value);
