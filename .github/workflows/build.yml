@@ -41,8 +41,11 @@ jobs:
         run: |
           & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -SkipAutomaticLocation
           cmake --preset final-universal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build --preset final-universal-release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cpack --preset final-universal -C Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

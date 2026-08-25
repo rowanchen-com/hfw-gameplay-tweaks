@@ -113,7 +113,7 @@ namespace HRZ2::DebugUI
 
 	static HCURSOR GetMenuCursor()
 	{
-		static const auto cursor = LoadCursorW(nullptr, IDC_ARROW);
+		static const auto cursor = LoadCursor(nullptr, IDC_ARROW);
 		return cursor;
 	}
 
