@@ -301,11 +301,20 @@ namespace
 
 	void EmitFlagCheck(Xbyak::CodeGenerator& Code, Feature Value, Xbyak::Label& Disabled)
 	{
+		// These checks run in the middle of the game's instruction stream. Preserve RFLAGS because
+		// some overwritten sequences (notably bow charge) are followed immediately by a conditional jump.
+		Xbyak::Label enabled;
+		Code.pushfq();
 		Code.push(r11);
 		Code.mov(r11, FlagAddress(Value));
 		Code.cmp(dword[r11], 0);
+		Code.jne(enabled);
 		Code.pop(r11);
-		Code.je(Disabled);
+		Code.popfq();
+		Code.jmp(Disabled);
+		Code.L(enabled);
+		Code.pop(r11);
+		Code.popfq();
 	}
 
 	void EmitOriginal(Xbyak::CodeGenerator& Code, std::initializer_list<std::uint8_t> Bytes)
@@ -551,8 +560,8 @@ namespace
 			Xbyak::Label original;
 			EmitFlagCheck(code, Feature::InstantBowCharge, original);
 			code.push(r11);
-			code.mov(r11d, std::bit_cast<uint32_t>(FullBowChargeValue));
-			code.movd(xmm1, r11d);
+			code.mov(r11, reinterpret_cast<std::uintptr_t>(&FullBowChargeValue));
+			code.movss(xmm1, dword[r11]);
 			code.pop(r11);
 			code.L(original);
 			EmitOriginal(code, { 0xC5, 0xF8, 0x28, 0xF1, 0xC5, 0xC0, 0x57, 0xFF });

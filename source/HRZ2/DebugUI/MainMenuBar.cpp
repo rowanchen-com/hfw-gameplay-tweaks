@@ -260,6 +260,8 @@ namespace HRZ2::DebugUI
 					if (Enabled) s->m_InfiniteAmmo = false;
 				}
 			}, debugAvailable);
+			addFeatureToggle("无限箭矢与陷阱", "将受支持的箭矢与陷阱计数保持为 99；可与上面任一种 DLL 弹药模式同时使用。",
+				TrainerCheats::Feature::InfiniteArrowsAndTraps);
 			addToggle("无限武器耐力", "武器相关耐力不会耗尽。", debugAvailable && debugSettings->m_Inexhaustible, [](bool Enabled)
 			{
 				if (auto s = DebugSettings::GetInstance()) s->m_Inexhaustible = Enabled;
