@@ -1,14 +1,15 @@
 #pragma once
 
 #include <atomic>
+#include <string>
 #include <imgui.h>
 #include "../Core/IStreamingManager.h"
+#include "../Core/Inventory.h"
 #include "DebugUIWindow.h"
 
 namespace HRZ2
 {
 	class RTTIRefObject;
-	class InventoryItem;
 }
 
 namespace HRZ2::DebugUI
@@ -39,6 +40,13 @@ namespace HRZ2::DebugUI
 		bool m_ShowLocalizedItemNames = true;
 		bool m_ShowResourceIds = false;
 
+		Ref<InventoryItem> m_ItemCountEditorItem;
+		GGUUID m_ItemCountEditorUUID;
+		std::string m_ItemCountEditorName;
+		int m_ItemCountEditorValue = 0;
+		bool m_OpenItemCountEditor = false;
+		bool m_FocusItemCountEditor = false;
+
 	public:
 		virtual void Render() override;
 		virtual bool Close() override;
@@ -46,6 +54,8 @@ namespace HRZ2::DebugUI
 		virtual std::string GetId() const override;
 
 	private:
-		void DrawTableContextMenu(InventoryItem *Item, const GGUUID& ItemUUID, bool OpenRequested);
+		void RequestItemCountEditor(InventoryItem *Item, const GGUUID& ItemUUID, const std::string& ItemName, uint32_t CurrentCount);
+		void RenderItemCountEditor();
+		void ApplyItemCountChange(InventoryItem *Item, const GGUUID& ItemUUID, int64_t CountDelta);
 	};
 }

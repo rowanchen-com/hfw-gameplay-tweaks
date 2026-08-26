@@ -87,6 +87,7 @@ namespace HRZ2::DebugUI
 		ImGui::Checkbox("仅显示玩家物品栏中的物品###ShowOnlyPlayerInventoryItems", &m_FilterItemsInPlayerInventory);
 		ImGui::Checkbox("显示游戏本地化名称###ShowLocalizedNames", &m_ShowLocalizedItemNames);
 		ImGui::Checkbox("显示内部资源 ID（高级）###ShowInventoryResourceIds", &m_ShowResourceIds);
+		ImGui::TextColored(ImVec4(0.82f, 0.98f, 1.0f, 1.0f), "单击物品所在行或数量，可直接输入目标总数量。");
 
 		const ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
 										   ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
@@ -218,12 +219,8 @@ namespace HRZ2::DebugUI
 						ImGui::TableNextRow();
 
 						ImGui::TableSetColumnIndex(0);
-						const bool rowPressed = ImGui::Selectable(entry, false,
-							ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
-						const bool openRequested =
-							(rowPressed && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ||
-							ImGui::IsItemClicked(ImGuiMouseButton_Right);
-						DrawTableContextMenu(entry.Hint.GetPtr(), resourceUUID, openRequested);
+						if (ImGui::Selectable(entry, false, ImGuiSelectableFlags_SpanAllColumns))
+							RequestItemCountEditor(entry.Hint.GetPtr(), resourceUUID, entry.Name, entry.Amount);
 
 						if (entry.Hint)
 						{
@@ -246,51 +243,96 @@ namespace HRZ2::DebugUI
 			ImGui::EndTable();
 		}
 
+		RenderItemCountEditor();
 	}
 
-	void PlayerInventoryWindow::DrawTableContextMenu(InventoryItem *Item, const GGUUID& ItemUUID, bool OpenRequested)
+	void PlayerInventoryWindow::RequestItemCountEditor(
+		InventoryItem *Item,
+		const GGUUID& ItemUUID,
+		const std::string& ItemName,
+		uint32_t CurrentCount)
 	{
-		if (OpenRequested)
-			ImGui::OpenPopup("IVITListRowPopup");
+		m_ItemCountEditorItem = Item;
+		m_ItemCountEditorUUID = ItemUUID;
+		m_ItemCountEditorName = ItemName;
+		m_ItemCountEditorValue = static_cast<int>(std::min(CurrentCount, static_cast<uint32_t>(999999)));
+		m_OpenItemCountEditor = true;
+		m_FocusItemCountEditor = true;
+	}
 
-		if (!ImGui::BeginPopup("IVITListRowPopup"))
-			return;
+	void PlayerInventoryWindow::RenderItemCountEditor()
+	{
+		constexpr const char *popupId = "修改物品数量###InventoryItemCountEditor";
+		const float scale = GetTrainerUIScale();
+		const auto displaySize = ImGui::GetIO().DisplaySize;
+		const float width = std::min(520.0f * scale, displaySize.x - 36.0f * scale);
 
-		int64_t itemCount = 0;
-
-		if (ImGui::Selectable("增加 1 个###AddOne", false, 0, ImVec2(260.0f * GetTrainerUIScale(), 0)))
-			itemCount += 1;
-
-		if (ImGui::Selectable("增加 5 个###AddFive"))
-			itemCount += 5;
-
-		// Only able to remove existing items
-		if (Item)
+		if (m_OpenItemCountEditor)
 		{
-			if (ImGui::Selectable("增加当前数量的两倍###AddDouble"))
-				itemCount += static_cast<int64_t>(Item->m_Amount) * 2;
-
-			ImGui::Selectable("##sepsel1", false, ImGuiSelectableFlags_Disabled);
-
-			if (ImGui::Selectable("移除 1 个###RemoveOne"))
-				itemCount -= 1;
-
-			if (ImGui::Selectable("移除 5 个###RemoveFive"))
-				itemCount -= 5;
-
-			if (ImGui::Selectable("移除一半###RemoveHalf"))
-				itemCount -= std::max(Item->m_Amount / 2, 1u);
-
-			ImGui::Selectable("##sepsel2", false, ImGuiSelectableFlags_Disabled);
-
-			if (ImGui::Selectable("全部移除###RemoveAll"))
-				itemCount -= Item->m_Amount;
+			ImGui::OpenPopup(popupId);
+			m_OpenItemCountEditor = false;
 		}
 
-		if (itemCount < 0)
+		ImGui::SetNextWindowPos(ImVec2(displaySize.x * 0.5f, displaySize.y * 0.5f),
+			ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(width, 0.0f), ImGuiCond_Appearing);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.0f * scale, 18.0f * scale));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, std::max(1.0f, 1.25f * scale));
+		ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.018f, 0.030f, 0.038f, 0.995f));
+		ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.95f, 0.72f, 0.28f, 1.00f));
+
+		const ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+		if (ImGui::BeginPopupModal(popupId, nullptr, flags))
+		{
+			const uint32_t currentCount = m_ItemCountEditorItem ? m_ItemCountEditorItem->m_Amount : 0;
+			ImGui::TextWrapped("物品：%s", m_ItemCountEditorName.c_str());
+			ImGui::Text("当前数量：%u", currentCount);
+			ImGui::Spacing();
+			ImGui::TextUnformatted("输入目标总数量（0 - 999999）");
+			ImGui::SetNextItemWidth(-FLT_MIN);
+			if (m_FocusItemCountEditor)
+			{
+				ImGui::SetKeyboardFocusHere();
+				m_FocusItemCountEditor = false;
+			}
+			ImGui::InputInt("##InventoryItemTargetCount", &m_ItemCountEditorValue, 1, 10);
+			m_ItemCountEditorValue = std::clamp(m_ItemCountEditorValue, 0, 999999);
+
+			ImGui::TextWrapped("输入 0 会把该物品全部移除；修改只执行一次，不会锁定数量。");
+			ImGui::Spacing();
+
+			const float buttonGap = 12.0f * scale;
+			const float buttonWidth = (width - 40.0f * scale - buttonGap) * 0.5f;
+			if (ImGui::Button("确认修改", ImVec2(buttonWidth, 50.0f * scale)))
+			{
+				const auto targetCount = static_cast<uint32_t>(m_ItemCountEditorValue);
+				const auto countDelta = static_cast<int64_t>(targetCount) - static_cast<int64_t>(currentCount);
+				ApplyItemCountChange(m_ItemCountEditorItem.GetPtr(), m_ItemCountEditorUUID, countDelta);
+				m_ItemCountEditorItem = nullptr;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine(0.0f, buttonGap);
+			if (ImGui::Button("取消", ImVec2(buttonWidth, 50.0f * scale)))
+			{
+				m_ItemCountEditorItem = nullptr;
+				ImGui::CloseCurrentPopup();
+			}
+
+			ImGui::EndPopup();
+		}
+
+		ImGui::PopStyleColor(2);
+		ImGui::PopStyleVar(3);
+	}
+
+	void PlayerInventoryWindow::ApplyItemCountChange(InventoryItem *Item, const GGUUID& ItemUUID, int64_t CountDelta)
+	{
+		if (CountDelta < 0 && Item)
 		{
 			// Removal doesn't need special handling
-			JobHeaderCPU::SubmitCallable([itemCount, item = Ref(Item)]
+			JobHeaderCPU::SubmitCallable([CountDelta, item = Ref(Item)]
 			{
 				auto entity = Player::GetLocalPlayer() ? Player::GetLocalPlayer()->m_Entity : nullptr;
 
@@ -303,12 +345,12 @@ namespace HRZ2::DebugUI
 				if (!inventory)
 					return;
 
-				inventory->RemoveItem(item, static_cast<uint32_t>(-itemCount), EInventoryItemRemoveType::Destroy, true);
+				inventory->RemoveItem(item, static_cast<uint32_t>(-CountDelta), EInventoryItemRemoveType::Destroy, true);
 			});
 		}
-		else if (itemCount != 0)
+		else if (CountDelta > 0)
 		{
-			const auto targetItemCount = static_cast<uint32_t>(itemCount);
+			const auto targetItemCount = static_cast<uint32_t>(CountDelta);
 
 			const bool itemWasAlreadySpawned = [&]()
 			{
@@ -355,8 +397,6 @@ namespace HRZ2::DebugUI
 				}
 			}
 		}
-
-		ImGui::EndPopup();
 	}
 
 	bool PlayerInventoryWindow::Close()
