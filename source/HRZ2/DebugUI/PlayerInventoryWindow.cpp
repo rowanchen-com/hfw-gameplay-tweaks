@@ -218,8 +218,12 @@ namespace HRZ2::DebugUI
 						ImGui::TableNextRow();
 
 						ImGui::TableSetColumnIndex(0);
-						ImGui::Selectable(entry, false, ImGuiSelectableFlags_SpanAllColumns);
-						DrawTableContextMenu(entry.Hint.GetPtr(), resourceUUID);
+						const bool rowPressed = ImGui::Selectable(entry, false,
+							ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
+						const bool openRequested =
+							(rowPressed && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ||
+							ImGui::IsItemClicked(ImGuiMouseButton_Right);
+						DrawTableContextMenu(entry.Hint.GetPtr(), resourceUUID, openRequested);
 
 						if (entry.Hint)
 						{
@@ -244,9 +248,12 @@ namespace HRZ2::DebugUI
 
 	}
 
-	void PlayerInventoryWindow::DrawTableContextMenu(InventoryItem *Item, const GGUUID& ItemUUID)
+	void PlayerInventoryWindow::DrawTableContextMenu(InventoryItem *Item, const GGUUID& ItemUUID, bool OpenRequested)
 	{
-		if (!ImGui::BeginPopupContextItem("IVITListRowPopup", ImGuiPopupFlags_MouseButtonLeft))
+		if (OpenRequested)
+			ImGui::OpenPopup("IVITListRowPopup");
+
+		if (!ImGui::BeginPopup("IVITListRowPopup"))
 			return;
 
 		int64_t itemCount = 0;

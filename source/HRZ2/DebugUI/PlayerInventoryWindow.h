@@ -46,6 +46,6 @@ namespace HRZ2::DebugUI
 		virtual std::string GetId() const override;
 
 	private:
-		void DrawTableContextMenu(InventoryItem *Item, const GGUUID& ItemUUID);
+		void DrawTableContextMenu(InventoryItem *Item, const GGUUID& ItemUUID, bool OpenRequested);
 	};
 }
