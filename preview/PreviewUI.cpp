@@ -58,7 +58,12 @@ namespace Preview
             bool FreeCrafting = false;
             bool ResourceIds = false;
             bool HardwareCursor = false;
+            bool DamageMultiplier = false;
+            bool DefenseMultiplier = false;
+            bool MovementSpeed = false;
+            bool FallSpeed = false;
             float Damage = 2.0f;
+            float Defense = 2.0f;
             float Speed = 3.0f;
             float Jump = 5.0f;
             float Falling = 0.5f;
@@ -429,10 +434,15 @@ namespace Preview
                         BeginBox("player-advanced", g_Subtab == 1 ? (g_State.Chinese ? "高级数值" : "ADVANCED VALUES") : (g_State.Chinese ? "快捷键" : "HOTKEYS"), ImVec2(w, size.y));
                         if (g_Subtab == 1)
                         {
-                            Slider("damage-mult", g_State.Chinese ? "伤害倍率" : "Damage multiplier", &g_State.Damage, 1, 10, "%.1fx");
-                            Slider("speed", g_State.Chinese ? "移动速度" : "Movement speed", &g_State.Speed, 1, 8, "%.1fx");
-                            Slider("jump", g_State.Chinese ? "跳跃高度" : "Jump height", &g_State.Jump, 1, 20, "%.1f");
-                            Slider("fall-speed", g_State.Chinese ? "下降速度" : "Falling speed", &g_State.Falling, .1f, 3, "%.1fx");
+                            Toggle("damage-mult-enable", g_State.Chinese ? "启用伤害倍率" : "Enable damage multiplier", &g_State.DamageMultiplier);
+                            ImGui::BeginDisabled(!g_State.DamageMultiplier);
+                            Slider("damage-mult", g_State.Chinese ? "伤害倍率数值" : "Damage value", &g_State.Damage, 1, 10, "%.1fx");
+                            ImGui::EndDisabled();
+                            Line();
+                            Toggle("defense-mult-enable", g_State.Chinese ? "启用防御倍率" : "Enable defense multiplier", &g_State.DefenseMultiplier);
+                            ImGui::BeginDisabled(!g_State.DefenseMultiplier);
+                            Slider("defense-mult", g_State.Chinese ? "防御倍率数值" : "Defense value", &g_State.Defense, 1, 10, "%.1fx");
+                            ImGui::EndDisabled();
                         }
                         else
                         {
@@ -451,17 +461,12 @@ namespace Preview
                         Toggle("ammo", g_State.Chinese ? "无限弹药" : "Infinite ammo", &g_State.InfiniteAmmo);
                         Toggle("arrows", g_State.Chinese ? "无限箭矢与陷阱" : "Infinite arrows and traps", &g_State.InfiniteArrows);
                         Toggle("reload", g_State.Chinese ? "无需装填" : "No reload", &g_State.NoReload);
-                        Line();
-                        Slider("weapon-damage", g_State.Chinese ? "伤害倍率" : "Damage multiplier", &g_State.Damage, 1, 10, "%.1fx");
                     }
                     else if (g_Subtab == 1)
                     {
-                        Toggle("air-jump", g_State.Chinese ? "无限踏空跳" : "Infinite air jump", &g_State.InfiniteJump);
-                        Toggle("noclip", g_State.Chinese ? "自由飞行穿墙" : "Free-flight noclip", &g_State.Noclip);
-                        Toggle("cursor", g_State.Chinese ? "硬件鼠标光标" : "Hardware cursor", &g_State.HardwareCursor);
-                        Line();
                         ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", g_State.Chinese ? "DLL 已动态加载" : "DLL loaded dynamically");
                         ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", g_State.Chinese ? "DirectX 12 渲染正常" : "DirectX 12 renderer ready");
+                        ImGui::TextColored(Theme::Muted, "%s", g_State.Chinese ? "数值修改默认关闭" : "Value modifiers default to off");
                         ImGui::TextColored(Theme::Muted, "FPS  %.0f", ImGui::GetIO().Framerate);
                     }
                     else
@@ -482,10 +487,18 @@ namespace Preview
                     BeginBox("main", title, ImVec2(w, size.y));
                     if (g_Page == Page::Movement)
                     {
-                        Slider("move", g_State.Chinese ? "移动速度" : "Movement speed", &g_State.Speed, 1, 8, "%.1fx");
-                        Slider("jump", g_State.Chinese ? "跳跃高度" : "Jump height", &g_State.Jump, 1, 20, "%.1f");
-                        Slider("fall", g_State.Chinese ? "下降速度" : "Falling speed", &g_State.Falling, .1f, 3, "%.1fx");
-                        Toggle("infinite-jump", g_State.Chinese ? "无限踏空跳" : "Infinite air jump", &g_State.InfiniteJump);
+                        Toggle("move-enable", g_State.Chinese ? "启用移动速度调整" : "Enable movement speed", &g_State.MovementSpeed);
+                        ImGui::BeginDisabled(!g_State.MovementSpeed);
+                        Slider("move", g_State.Chinese ? "移动速度倍率" : "Movement multiplier", &g_State.Speed, 1, 8, "%.1fx");
+                        ImGui::EndDisabled();
+                        Toggle("infinite-jump", g_State.Chinese ? "启用无限踏空跳" : "Enable infinite air jump", &g_State.InfiniteJump);
+                        ImGui::BeginDisabled(!g_State.InfiniteJump);
+                        Slider("jump", g_State.Chinese ? "跳跃高度倍率" : "Jump height multiplier", &g_State.Jump, 1, 20, "%.1f");
+                        ImGui::EndDisabled();
+                        Toggle("fall-enable", g_State.Chinese ? "启用下降速度调整" : "Enable falling speed", &g_State.FallSpeed);
+                        ImGui::BeginDisabled(!g_State.FallSpeed);
+                        Slider("fall", g_State.Chinese ? "下降速度倍率" : "Falling multiplier", &g_State.Falling, .1f, 3, "%.1fx");
+                        ImGui::EndDisabled();
                         Toggle("noclip-main", g_State.Chinese ? "自由飞行穿墙" : "Free-flight noclip", &g_State.Noclip);
                     }
                     else if (g_Page == Page::Resources)
