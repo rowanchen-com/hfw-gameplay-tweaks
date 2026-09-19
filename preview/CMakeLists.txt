@@ -1,5 +1,9 @@
 set(PREVIEW_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/preview")
 
+# Imported CMake targets are directory-scoped. The imgui target discovered by
+# source/CMakeLists.txt is a sibling and is therefore not visible here.
+find_package(imgui CONFIG REQUIRED)
+
 add_library(HFWMenuPreview SHARED
     PreviewDll.cpp
     PreviewRenderer.cpp
