@@ -4,8 +4,8 @@
 
 The `ui-preview` branch contains a game-independent DirectX 12 preview for testing the redesigned menu, input handling, Chinese fonts, DPI scaling, and widget animations without installing the game.
 
-1. Open **Actions → Build Menu Preview → Run workflow**.
-2. Download `HFW-Menu-Preview` after the run finishes.
+1. Open **Actions → Build Windows DLL → Run workflow** and select the `ui-preview` branch.
+2. Download `HFW-Menu-Preview` after the run finishes. Running the same workflow on `master` still builds the normal game DLL.
 3. Keep `HFWMenuPreview.exe` and `HFWMenuPreview.dll` in the same folder, then run the EXE.
 
 The EXE dynamically loads the DLL, while every feature uses mock state only. It does not inject into another process, scan memory, or change game data. Press `Insert` to hide or show the menu.

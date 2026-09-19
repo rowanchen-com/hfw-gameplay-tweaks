@@ -40,12 +40,21 @@ jobs:
         shell: pwsh
         run: |
           & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -SkipAutomaticLocation
-          cmake --preset final-universal
+          if ($env:GITHUB_REF_NAME -eq "ui-preview") {
+            cmake --preset final-universal -DHFW_BUILD_MENU_PREVIEW=ON
+          } else {
+            cmake --preset final-universal
+          }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build --preset final-universal-release
+          if ($env:GITHUB_REF_NAME -eq "ui-preview") {
+            cmake --build bin/final-universal --config Release --target HFWMenuPreview HFWMenuPreviewHost
+          } else {
+            cmake --build --preset final-universal-release
+          }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Stage flat artifact
+        if: github.ref_name != 'ui-preview'
         shell: pwsh
         run: |
           $artifactDir = Join-Path $PWD "artifact"
@@ -65,6 +74,7 @@ jobs:
           Copy-Item -LiteralPath "resources/mod_DamageSettings.ini" -Destination $artifactDir
 
       - name: Upload build artifacts
+        if: github.ref_name != 'ui-preview'
         uses: actions/upload-artifact@v4
         with:
           name: HFW-Gameplay-Tweaks-zh-CN
@@ -74,3 +84,30 @@ jobs:
             artifact/winhttp.dll
             artifact/mod_config.ini
             artifact/mod_DamageSettings.ini
+
+      - name: Stage flat preview artifact
+        if: github.ref_name == 'ui-preview'
+        shell: pwsh
+        run: |
+          $artifactDir = Join-Path $PWD "preview-artifact"
+          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+
+          $previewExe = @(Get-ChildItem -LiteralPath "bin/final-universal/preview" -Filter "HFWMenuPreview.exe" -File -Recurse)
+          $previewDll = @(Get-ChildItem -LiteralPath "bin/final-universal/preview" -Filter "HFWMenuPreview.dll" -File -Recurse)
+          if ($previewExe.Count -ne 1 -or $previewDll.Count -ne 1) {
+            throw "Expected one preview EXE and one preview DLL; found EXE=$($previewExe.Count), DLL=$($previewDll.Count)."
+          }
+
+          Copy-Item -LiteralPath $previewExe[0].FullName -Destination $artifactDir
+          Copy-Item -LiteralPath $previewDll[0].FullName -Destination $artifactDir
+
+      - name: Upload preview artifact
+        if: github.ref_name == 'ui-preview'
+        uses: actions/upload-artifact@v4
+        with:
+          name: HFW-Menu-Preview
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            preview-artifact/HFWMenuPreview.exe
+            preview-artifact/HFWMenuPreview.dll
