@@ -1,0 +1,76 @@
+name: Build Menu Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-preview:
+    name: Windows x64 menu preview
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Prepare vcpkg
+        shell: pwsh
+        run: |
+          $vcpkgRoot = Join-Path $env:RUNNER_TEMP "vcpkg"
+          $binaryCache = Join-Path $env:RUNNER_TEMP "vcpkg-binary-cache"
+          git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot
+          git -C $vcpkgRoot checkout a39a74405f277773aba08018bb797cb4a6614d0c
+          & (Join-Path $vcpkgRoot "bootstrap-vcpkg.bat") -disableMetrics
+          New-Item -ItemType Directory -Path $binaryCache -Force | Out-Null
+          "VCPKG_ROOT=$vcpkgRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VCPKG_DEFAULT_BINARY_CACHE=$binaryCache" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-binary-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-ports/**') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Configure preview
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -SkipAutomaticLocation
+          cmake --preset final-universal -DHFW_BUILD_MENU_PREVIEW=ON
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build preview
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -SkipAutomaticLocation
+          cmake --build bin/final-universal --config Release --target HFWMenuPreview HFWMenuPreviewHost
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stage flat preview artifact
+        shell: pwsh
+        run: |
+          $artifactDir = Join-Path $PWD "preview-artifact"
+          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+
+          $previewExe = Get-ChildItem -LiteralPath "bin/final-universal/preview" -Filter "HFWMenuPreview.exe" -File -Recurse
+          $previewDll = Get-ChildItem -LiteralPath "bin/final-universal/preview" -Filter "HFWMenuPreview.dll" -File -Recurse
+          if ($previewExe.Count -ne 1 -or $previewDll.Count -ne 1) {
+            throw "Expected one preview EXE and one preview DLL; found EXE=$($previewExe.Count), DLL=$($previewDll.Count)."
+          }
+
+          Copy-Item -LiteralPath $previewExe[0].FullName -Destination $artifactDir
+          Copy-Item -LiteralPath $previewDll[0].FullName -Destination $artifactDir
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HFW-Menu-Preview
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            preview-artifact/HFWMenuPreview.exe
+            preview-artifact/HFWMenuPreview.dll

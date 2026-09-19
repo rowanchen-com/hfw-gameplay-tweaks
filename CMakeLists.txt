@@ -24,6 +24,11 @@ execute_process(
 #
 add_subdirectory("${PROJECT_SOURCE_PATH}")
 
+option(HFW_BUILD_MENU_PREVIEW "Build the standalone menu preview" OFF)
+if(HFW_BUILD_MENU_PREVIEW)
+    add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/preview")
+endif()
+
 #
 # And finally produce build artifacts
 #

@@ -1,5 +1,15 @@
 # Horizon Forbidden West Gameplay Tweaks & Cheat Menu
 
+## Standalone menu preview
+
+The `ui-preview` branch contains a game-independent DirectX 12 preview for testing the redesigned menu, input handling, Chinese fonts, DPI scaling, and widget animations without installing the game.
+
+1. Open **Actions → Build Menu Preview → Run workflow**.
+2. Download `HFW-Menu-Preview` after the run finishes.
+3. Keep `HFWMenuPreview.exe` and `HFWMenuPreview.dll` in the same folder, then run the EXE.
+
+The EXE dynamically loads the DLL, while every feature uses mock state only. It does not inject into another process, scan memory, or change game data. Press `Insert` to hide or show the menu.
+
 Source code for the Horizon Forbidden West mod, with a complete Simplified Chinese interface and localized configuration resources.
 
 ## Simplified Chinese localization
