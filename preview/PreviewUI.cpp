@@ -971,8 +971,22 @@ namespace Preview
     {
         ImGuiIO& io = ImGui::GetIO();
         const float s = std::clamp(scale, .9f, 1.6f);
-        ImFontConfig cfg {}; cfg.PixelSnapH = true; cfg.OversampleH = 3; cfg.OversampleV = 2; cfg.RasterizerMultiply = 1.18f;
-        const ImWchar* ranges = io.Fonts->GetGlyphRangesChineseFull();
+        ImFontConfig cfg {}; cfg.PixelSnapH = true; cfg.OversampleH = 2; cfg.OversampleV = 2; cfg.RasterizerMultiply = 1.18f;
+
+        // A complete CJK range is far too large when baked twice (regular and bold).
+        // On some DX12 drivers that made the font texture fail and left the preview
+        // showing only its white clear colour. Keep the common Chinese set and add
+        // every less-common glyph currently used by the preview instead.
+        static ImVector<ImWchar> previewGlyphRanges;
+        if (previewGlyphRanges.empty())
+        {
+            ImFontGlyphRangesBuilder builder;
+            builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+            builder.AddRanges(io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+            builder.AddText("·、。一上下不与专世中丶为主久义之买于云互人仅他以件任会传伤位体作使例保修倍值偏停充光入全关其具兽内军准出击分创删到制剂前力功加务动勇包化匣区升午半单厂厅原发取叛口只可叶同名后含启告和品器图在地坏城域基塔塞墙处备复多夜大天失头子字存学完定实害家导尔尖尘尚尼层属山岸崩工差已常并序应度建开式弓弹强当形得御循必志快态总恢意戏成或战所手才打执技拍拟择持指按排探控撤操改放敌教数文斗斥斯无日时明星昼显晴暂暴有朗未本杀构果染查标栏档检模次正武殊比气氧永求沙法注泽浆海消添渲游溃源滑满演火炎炙点炼焰照爪片版牙物特状猎猛率玩环理生用由画界瘠的盖目瞬矢破硬确碎示称移空穿窗立章筛算箭系索级线组织经结统续编缩缺罐置翔者耐能脚腐自致苦药获菜营蓄薄藏蚀行补袋要覆视览警计认记设访试该说读调贫购资超跃跳踏身载辑输进追送选速逻部配量金铁铸销锁锭镜长闭问间阱防阵降限除陷隐雨雷雾需霆面鞭页项预领额首验骑骨高默鼠（），：；");
+            builder.BuildRanges(&previewGlyphRanges);
+        }
+        const ImWchar* ranges = previewGlyphRanges.Data;
         const float regularSize = std::round(17.5f * s);
         const float boldSize = std::round(23.0f * s);
         for (const auto& p : std::array<std::filesystem::path, 3>{ L"C:/Windows/Fonts/msyh.ttc", L"C:/Windows/Fonts/segoeui.ttf", L"C:/Windows/Fonts/simhei.ttf" })
