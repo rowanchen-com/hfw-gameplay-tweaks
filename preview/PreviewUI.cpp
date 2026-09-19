@@ -38,14 +38,15 @@ namespace Preview
         struct State
         {
             bool Chinese = true;
+            bool InGame = false;
             bool Invincible = false;
-            bool InfiniteHealth = true;
+            bool InfiniteHealth = false;
             bool IgnoreDamage = false;
-            bool InfiniteStamina = true;
-            bool NoFallDamage = true;
+            bool InfiniteStamina = false;
+            bool NoFallDamage = false;
             bool InstantCharge = false;
             bool InfiniteAmmo = false;
-            bool InfiniteArrows = true;
+            bool InfiniteArrows = false;
             bool NoReload = false;
             bool MountAnywhere = false;
             bool AiVsAi = false;
@@ -56,7 +57,7 @@ namespace Preview
             bool RevealMap = false;
             bool FreeCrafting = false;
             bool ResourceIds = false;
-            bool HardwareCursor = true;
+            bool HardwareCursor = false;
             float Damage = 2.0f;
             float Speed = 3.0f;
             float Jump = 5.0f;
@@ -78,6 +79,11 @@ namespace Preview
         std::unordered_map<ImGuiID, float> g_Anim;
 
         float S(float value) { return value * g_Scale; }
+
+        bool PageNeedsPlayer(Page page)
+        {
+            return page == Page::Player || page == Page::Movement || page == Page::Resources || page == Page::Teleport;
+        }
 
         float Ease(float current, float target, float speed)
         {
@@ -174,7 +180,7 @@ namespace Preview
             return pressed;
         }
 
-        bool Nav(const char* idText, Icon icon, const char* label, Page page)
+        bool Nav(const char* idText, Icon icon, const char* label, Page page, bool enabled = true)
         {
             ImGuiWindow* w = ImGui::GetCurrentWindow();
             const ImGuiID id = w->GetID(idText);
@@ -182,17 +188,32 @@ namespace Preview
             ImGui::ItemSize(bb);
             if (!ImGui::ItemAdd(bb, id)) return false;
             bool hovered = false, held = false;
-            const bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+            const bool pressed = enabled && ImGui::ButtonBehavior(bb, id, &hovered, &held);
             const bool selected = page == g_Page;
             float& a = Anim(id, 2, selected ? 1.0f : 0.0f);
             float& h = Anim(id, 3, 0.0f);
             a = Ease(a, selected ? 1.0f : 0.0f, 12.0f);
             h = Ease(h, hovered ? 1.0f : 0.0f, 18.0f);
             w->DrawList->AddRectFilled(bb.Min, bb.Max, Col(Theme::FrameOn, a * .82f + h * .18f), S(5));
-            const float lit = std::max(a, h * .6f);
+            const float lit = enabled ? std::max(a, h * .6f) : 0.0f;
             IconGlyph(w->DrawList, icon, bb.Min + ImVec2(S(18), S(19)), Col(Mix(Theme::Muted, Theme::Accent, lit)), .82f);
             const ImVec2 ts = ImGui::CalcTextSize(label);
-            w->DrawList->AddText(bb.Min + ImVec2(S(40), (bb.GetHeight() - ts.y) * .5f), Col(Mix(Theme::Muted, Theme::Text, lit)), label);
+            ImVec4 textColor = Mix(Theme::Muted, Theme::Text, lit);
+            if (!enabled) textColor.w = .38f;
+            w->DrawList->AddText(bb.Min + ImVec2(S(40), (bb.GetHeight() - ts.y) * .5f), Col(textColor), label);
+            if (!enabled)
+            {
+                const ImVec2 lockCenter(bb.Max.x - S(13), bb.GetCenter().y + S(1));
+                w->DrawList->AddRect(lockCenter - ImVec2(S(4), S(2)), lockCenter + ImVec2(S(4), S(5)), Col(Theme::Muted, .34f), S(1));
+                w->DrawList->PathArcTo(lockCenter - ImVec2(0, S(2)), S(3), IM_PI, IM_PI * 2.0f, 10);
+                w->DrawList->PathStroke(Col(Theme::Muted, .34f), 0, std::max(1.0f, S(1.1f)));
+                if (ImGui::IsMouseHoveringRect(bb.Min, bb.Max))
+                {
+                    ImGui::BeginTooltip();
+                    ImGui::TextUnformatted(g_State.Chinese ? "进入游戏并创建玩家实体后可用" : "Available after entering the game");
+                    ImGui::EndTooltip();
+                }
+            }
             if (pressed && !selected)
             {
                 g_Page = page;
@@ -356,6 +377,23 @@ namespace Preview
             const ImVec2 p = ImGui::GetCursorScreenPos();
             ImGui::GetWindowDrawList()->AddLine(p, p + ImVec2(ImGui::GetContentRegionAvail().x, 0), Col(Theme::Border));
             ImGui::Dummy(ImVec2(0, S(1)));
+        }
+
+        float LobbyNotice()
+        {
+            const float height = S(42);
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const ImVec2 z(ImGui::GetContentRegionAvail().x, height);
+            ImDrawList* d = ImGui::GetWindowDrawList();
+            const ImVec4 warning(.95f, .65f, .24f, 1.0f);
+            d->AddRectFilled(p, p + z, Col(ImVec4(.17f, .105f, .035f, .72f)), S(5));
+            d->AddRect(p, p + z, Col(warning, .28f), S(5));
+            d->AddCircleFilled(p + ImVec2(S(19), height * .5f), S(4), Col(warning));
+            d->AddText(p + ImVec2(S(32), S(7)), Col(warning), g_State.Chinese ? "当前处于大厅模拟状态" : "Lobby simulation is active");
+            d->AddText(p + ImVec2(S(32), S(23)), Col(Theme::Muted, .72f), g_State.Chinese ? "玩家实体尚未创建，以下功能不可操作。" : "Player entity is unavailable; controls below are disabled.");
+            ImGui::Dummy(z);
+            ImGui::Dummy(ImVec2(0, S(4)));
+            return height + S(4);
         }
 
         void TwoColumns(ImVec2 size, const std::function<void(float)>& left, const std::function<void(float)>& right)
@@ -571,27 +609,36 @@ namespace Preview
             d->AddText(p + ImVec2(S(66), S(18)), Col(Theme::Text), "HFW TOOLS"); d->AddText(p + ImVec2(S(66), S(38)), Col(Theme::Muted, .65f), "Interface preview");
 
             ImGui::SetCursorPos(ImVec2(S(14), S(78))); ImGui::BeginChild("##nav", ImVec2(sidebar - S(28), z.y - S(148)), false, ImGuiWindowFlags_NoScrollbar);
-            Category(g_State.Chinese ? "角色" : "PLAYER"); Nav("player", Icon::User, g_State.Chinese ? "玩家" : "Player", Page::Player); Nav("move", Icon::Move, g_State.Chinese ? "移动与镜头" : "Movement", Page::Movement);
-            ImGui::Dummy(ImVec2(0, S(9))); Category(g_State.Chinese ? "游戏" : "GAME"); Nav("resources", Icon::Bag, g_State.Chinese ? "资源与物品" : "Resources", Page::Resources); Nav("world", Icon::Globe, g_State.Chinese ? "世界" : "World", Page::World); Nav("teleport", Icon::Pin, g_State.Chinese ? "传送" : "Teleport", Page::Teleport);
+            Category(g_State.Chinese ? "角色" : "PLAYER"); Nav("player", Icon::User, g_State.Chinese ? "玩家" : "Player", Page::Player, g_State.InGame); Nav("move", Icon::Move, g_State.Chinese ? "移动与镜头" : "Movement", Page::Movement, g_State.InGame);
+            ImGui::Dummy(ImVec2(0, S(9))); Category(g_State.Chinese ? "游戏" : "GAME"); Nav("resources", Icon::Bag, g_State.Chinese ? "资源与物品" : "Resources", Page::Resources, g_State.InGame); Nav("world", Icon::Globe, g_State.Chinese ? "世界" : "World", Page::World); Nav("teleport", Icon::Pin, g_State.Chinese ? "传送" : "Teleport", Page::Teleport, g_State.InGame);
             ImGui::Dummy(ImVec2(0, S(9))); Category(g_State.Chinese ? "通用" : "COMMON"); Nav("settings", Icon::Gear, g_State.Chinese ? "设置" : "Settings", Page::Settings); ImGui::EndChild();
 
             d->AddLine(p + ImVec2(0, z.y - S(66)), p + ImVec2(sidebar, z.y - S(66)), Col(Theme::Border)); d->AddCircleFilled(p + ImVec2(S(35), z.y - S(33)), S(17), Col(Theme::FrameOn), 24); IconGlyph(d, Icon::User, p + ImVec2(S(35), z.y - S(33)), Col(Theme::Accent), .78f);
             d->AddText(p + ImVec2(S(60), z.y - S(46)), Col(Theme::Text), g_State.Chinese ? "本地预览" : "Local preview"); d->AddText(p + ImVec2(S(60), z.y - S(26)), Col(Theme::Muted, .72f), "DX12 / Mock state");
 
             ImGui::SetCursorPos(ImVec2(sidebar + S(22), S(17))); Icon save = Icon::Save; FlatButton("save", g_State.Chinese ? "保存" : "Save", ImVec2(S(92), S(31)), &save);
-            ImGui::SetCursorPos(ImVec2(sidebar + S(130), S(17))); const char* zh[] = { "常用", "高级", "快捷键" }; const char* en[] = { "General", "Advanced", "Hotkeys" };
-            for (int i = 0; i < 3; ++i)
+            if (g_Page == Page::Player)
             {
-                ImGui::PushID(i); ImDrawFlags flags = i == 0 ? ImDrawFlags_RoundCornersLeft : (i == 2 ? ImDrawFlags_RoundCornersRight : ImDrawFlags_None);
-                if (Subtab("##subtab", g_State.Chinese ? zh[i] : en[i], g_Subtab == i, ImVec2(S(90), S(31)), flags) && g_Subtab != i) { g_Subtab = i; g_PageAnim = 0; }
-                ImGui::PopID(); if (i != 2) ImGui::SameLine(0, 0);
+                ImGui::SetCursorPos(ImVec2(sidebar + S(130), S(17))); const char* zh[] = { "常用", "高级", "快捷键" }; const char* en[] = { "General", "Advanced", "Hotkeys" };
+                for (int i = 0; i < 3; ++i)
+                {
+                    ImGui::PushID(i); ImDrawFlags flags = i == 0 ? ImDrawFlags_RoundCornersLeft : (i == 2 ? ImDrawFlags_RoundCornersRight : ImDrawFlags_None);
+                    if (Subtab("##subtab", g_State.Chinese ? zh[i] : en[i], g_Subtab == i, ImVec2(S(90), S(31)), flags) && g_Subtab != i) { g_Subtab = i; g_PageAnim = 0; }
+                    ImGui::PopID(); if (i != 2) ImGui::SameLine(0, 0);
+                }
             }
+            ImGui::SetCursorPos(ImVec2(z.x - S(318), S(17))); if (FlatButton("session", g_State.InGame ? (g_State.Chinese ? "游戏内" : "In game") : (g_State.Chinese ? "大厅" : "Lobby"), ImVec2(S(126), S(31)))) g_State.InGame = !g_State.InGame;
             ImGui::SetCursorPos(ImVec2(z.x - S(176), S(17))); if (FlatButton("lang", g_State.Chinese ? "中 / EN" : "EN / 中", ImVec2(S(92), S(31)))) g_State.Chinese = !g_State.Chinese; ImGui::SameLine(0, S(8)); if (FlatButton("close", "X", ImVec2(S(34), S(31)))) requestExit = true;
             d->AddText(p + ImVec2(sidebar + S(22), top + S(16)), Col(Theme::Muted, .65f), PageName());
 
             g_PageAnim = Ease(g_PageAnim, 1, 9.5f); const float contentTop = top + S(42); const ImVec2 cp(sidebar + S(22), contentTop + S(7) * (1 - g_PageAnim)); const ImVec2 cs(z.x - sidebar - S(44), z.y - contentTop - S(20));
             ImGui::SetCursorPos(cp); ImGui::PushStyleVar(ImGuiStyleVar_Alpha, std::clamp(g_PageAnim, .02f, 1.0f)); ImGui::BeginChild("##content", cs, false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-            if (g_Page == Page::Player) PlayerPage(cs); else StandardPage(cs);
+            const bool unavailable = PageNeedsPlayer(g_Page) && !g_State.InGame;
+            float noticeHeight = unavailable ? LobbyNotice() : 0.0f;
+            ImVec2 pageSize(cs.x, cs.y - noticeHeight);
+            if (unavailable) ImGui::BeginDisabled();
+            if (g_Page == Page::Player) PlayerPage(pageSize); else StandardPage(pageSize);
+            if (unavailable) ImGui::EndDisabled();
             ImGui::EndChild(); ImGui::PopStyleVar();
         }
         ImGui::End(); ImGui::PopStyleColor(); ImGui::PopStyleVar();
