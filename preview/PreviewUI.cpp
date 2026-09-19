@@ -467,7 +467,7 @@ namespace Preview
                     else
                     {
                         ImGui::TextColored(Theme::Muted, "%s", g_State.Chinese ? "预览程序没有游戏功能。" : "The preview has no game functions.");
-                        ImGui::TextWrapped("All controls use local mock state for visual and animation testing.");
+                        ImGui::TextWrapped(g_State.Chinese ? "所有控件只使用本地模拟状态，用于检查视觉效果和动画。" : "All controls use local mock state for visual and animation testing.");
                     }
                     EndBox();
                 });
@@ -482,26 +482,38 @@ namespace Preview
                     BeginBox("main", title, ImVec2(w, size.y));
                     if (g_Page == Page::Movement)
                     {
-                        Slider("move", "移动速度", &g_State.Speed, 1, 8, "%.1fx"); Slider("jump", "跳跃高度", &g_State.Jump, 1, 20, "%.1f"); Slider("fall", "下降速度", &g_State.Falling, .1f, 3, "%.1fx");
-                        Toggle("infinite-jump", "无限踏空跳", &g_State.InfiniteJump); Toggle("noclip-main", "自由飞行穿墙", &g_State.Noclip);
+                        Slider("move", g_State.Chinese ? "移动速度" : "Movement speed", &g_State.Speed, 1, 8, "%.1fx");
+                        Slider("jump", g_State.Chinese ? "跳跃高度" : "Jump height", &g_State.Jump, 1, 20, "%.1f");
+                        Slider("fall", g_State.Chinese ? "下降速度" : "Falling speed", &g_State.Falling, .1f, 3, "%.1fx");
+                        Toggle("infinite-jump", g_State.Chinese ? "无限踏空跳" : "Infinite air jump", &g_State.InfiniteJump);
+                        Toggle("noclip-main", g_State.Chinese ? "自由飞行穿墙" : "Free-flight noclip", &g_State.Noclip);
                     }
                     else if (g_Page == Page::Resources)
                     {
-                        Slider("amount", "目标数量", &g_State.Amount, 0, 9999, "%.0f"); Toggle("craft", "无视制作与购买需求", &g_State.FreeCrafting); Toggle("ids", "显示内部资源 ID", &g_State.ResourceIds);
-                        FlatButton("apply", "应用模拟数值", ImVec2(ImGui::GetContentRegionAvail().x, S(31)));
+                        Slider("amount", g_State.Chinese ? "目标数量" : "Target amount", &g_State.Amount, 0, 9999, "%.0f");
+                        Toggle("craft", g_State.Chinese ? "无视制作与购买需求" : "Ignore crafting and purchase costs", &g_State.FreeCrafting);
+                        Toggle("ids", g_State.Chinese ? "显示内部资源 ID" : "Show internal resource IDs", &g_State.ResourceIds);
+                        FlatButton("apply", g_State.Chinese ? "应用模拟数值" : "Apply mock value", ImVec2(ImGui::GetContentRegionAvail().x, S(31)));
                     }
                     else if (g_Page == Page::World)
                     {
-                        Toggle("freeze", "锁定世界时间", &g_State.FreezeTime); Slider("time", "当前时间", &g_State.Time, 0, 24, "%.1fh"); Toggle("weather", "覆盖当前天气", &g_State.WeatherOverride); Toggle("map", "显示完整地图", &g_State.RevealMap);
+                        Toggle("freeze", g_State.Chinese ? "锁定世界时间" : "Freeze world time", &g_State.FreezeTime);
+                        Slider("time", g_State.Chinese ? "当前时间" : "Current time", &g_State.Time, 0, 24, "%.1fh");
+                        Toggle("weather", g_State.Chinese ? "覆盖当前天气" : "Override current weather", &g_State.WeatherOverride);
+                        Toggle("map", g_State.Chinese ? "显示完整地图" : "Reveal full map", &g_State.RevealMap);
                     }
                     else if (g_Page == Page::Teleport)
                     {
-                        const char* places[] = { "基地", "炙矛地", "削链镇", "竞技场", "旧金山遗迹" };
-                        Combo("location", "目标位置", &g_State.Location, places, IM_ARRAYSIZE(places)); FlatButton("teleport", "执行模拟传送", ImVec2(ImGui::GetContentRegionAvail().x, S(31)));
+                        const char* placesZh[] = { "基地", "炙矛地", "削链镇", "竞技场", "旧金山遗迹" };
+                        const char* placesEn[] = { "The Base", "Scalding Spear", "Chainscrape", "The Arena", "San Francisco Ruins" };
+                        const char* const* places = g_State.Chinese ? placesZh : placesEn;
+                        Combo("location", g_State.Chinese ? "目标位置" : "Destination", &g_State.Location, places, IM_ARRAYSIZE(placesZh));
+                        FlatButton("teleport", g_State.Chinese ? "执行模拟传送" : "Run mock teleport", ImVec2(ImGui::GetContentRegionAvail().x, S(31)));
                     }
                     else
                     {
-                        Toggle("language", g_State.Chinese ? "中文界面" : "Chinese interface", &g_State.Chinese); Toggle("hardware", "硬件鼠标光标", &g_State.HardwareCursor); Slider("ui", "界面缩放", &g_State.InterfaceScale, .85f, 1.5f, "%.2fx");
+                        Toggle("hardware", g_State.Chinese ? "硬件鼠标光标" : "Hardware mouse cursor", &g_State.HardwareCursor);
+                        Slider("ui", g_State.Chinese ? "界面缩放" : "Interface scale", &g_State.InterfaceScale, .85f, 1.5f, "%.2fx");
                     }
                     EndBox();
                 },
@@ -510,7 +522,10 @@ namespace Preview
                     BeginBox("secondary", g_State.Chinese ? "状态与预览" : "STATUS & PREVIEW", ImVec2(w, size.y));
                     if (g_Page == Page::World)
                     {
-                        const char* weather[] = { "晴朗", "多云", "雨天", "沙尘暴" }; Combo("weather-select", "天气", &g_State.Weather, weather, IM_ARRAYSIZE(weather));
+                        const char* weatherZh[] = { "晴朗", "多云", "雨天", "沙尘暴" };
+                        const char* weatherEn[] = { "Clear", "Cloudy", "Rain", "Sandstorm" };
+                        const char* const* weather = g_State.Chinese ? weatherZh : weatherEn;
+                        Combo("weather-select", g_State.Chinese ? "天气" : "Weather", &g_State.Weather, weather, IM_ARRAYSIZE(weatherZh));
                     }
                     else
                     {
@@ -606,7 +621,7 @@ namespace Preview
             d->AddLine(p + ImVec2(sidebar, 0), p + ImVec2(sidebar, z.y), Col(Theme::Border)); d->AddLine(p + ImVec2(sidebar, top), p + ImVec2(z.x, top), Col(Theme::Border));
             d->AddRectFilled(p + ImVec2(S(18), S(16)), p + ImVec2(S(54), S(52)), Col(Theme::FrameOn), S(7)); d->AddRect(p + ImVec2(S(18), S(16)), p + ImVec2(S(54), S(52)), Col(Theme::Accent, .25f), S(7));
             if (g_Bold) d->AddText(g_Bold, g_Bold->FontSize, p + ImVec2(S(24), S(20)), Col(Theme::Accent), "HF");
-            d->AddText(p + ImVec2(S(66), S(18)), Col(Theme::Text), "HFW TOOLS"); d->AddText(p + ImVec2(S(66), S(38)), Col(Theme::Muted, .65f), "Interface preview");
+            d->AddText(p + ImVec2(S(66), S(18)), Col(Theme::Text), "HFW TOOLS"); d->AddText(p + ImVec2(S(66), S(38)), Col(Theme::Muted, .65f), g_State.Chinese ? "界面预览" : "Interface preview");
 
             ImGui::SetCursorPos(ImVec2(S(14), S(78))); ImGui::BeginChild("##nav", ImVec2(sidebar - S(28), z.y - S(148)), false, ImGuiWindowFlags_NoScrollbar);
             Category(g_State.Chinese ? "角色" : "PLAYER"); Nav("player", Icon::User, g_State.Chinese ? "玩家" : "Player", Page::Player, g_State.InGame); Nav("move", Icon::Move, g_State.Chinese ? "移动与镜头" : "Movement", Page::Movement, g_State.InGame);
@@ -614,7 +629,7 @@ namespace Preview
             ImGui::Dummy(ImVec2(0, S(9))); Category(g_State.Chinese ? "通用" : "COMMON"); Nav("settings", Icon::Gear, g_State.Chinese ? "设置" : "Settings", Page::Settings); ImGui::EndChild();
 
             d->AddLine(p + ImVec2(0, z.y - S(66)), p + ImVec2(sidebar, z.y - S(66)), Col(Theme::Border)); d->AddCircleFilled(p + ImVec2(S(35), z.y - S(33)), S(17), Col(Theme::FrameOn), 24); IconGlyph(d, Icon::User, p + ImVec2(S(35), z.y - S(33)), Col(Theme::Accent), .78f);
-            d->AddText(p + ImVec2(S(60), z.y - S(46)), Col(Theme::Text), g_State.Chinese ? "本地预览" : "Local preview"); d->AddText(p + ImVec2(S(60), z.y - S(26)), Col(Theme::Muted, .72f), "DX12 / Mock state");
+            d->AddText(p + ImVec2(S(60), z.y - S(46)), Col(Theme::Text), g_State.Chinese ? "本地预览" : "Local preview"); d->AddText(p + ImVec2(S(60), z.y - S(26)), Col(Theme::Muted, .72f), g_State.Chinese ? "DX12 / 模拟状态" : "DX12 / Mock state");
 
             ImGui::SetCursorPos(ImVec2(sidebar + S(22), S(17))); Icon save = Icon::Save; FlatButton("save", g_State.Chinese ? "保存" : "Save", ImVec2(S(92), S(31)), &save);
             if (g_Page == Page::Player)
