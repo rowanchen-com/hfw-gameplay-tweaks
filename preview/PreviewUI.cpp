@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -32,62 +33,97 @@ namespace Preview
             constexpr ImVec4 Group { 0.019f, 0.035f, 0.062f, 1.00f };
         }
 
-        enum class Page { Player, Movement, Resources, World, Teleport, Settings };
+        enum class Page { Player, Resources, World, Developer, Settings };
         enum class Icon { User, Move, Bag, Globe, Pin, Gear, Save };
+        enum class Editor { None, Defense, Damage, Movement, Jump, Falling, Tools, Ammo, Resources, Experience, SkillPoints };
 
         struct State
         {
             bool Chinese = true;
             bool InGame = false;
-            bool Invincible = false;
-            bool InfiniteHealth = false;
-            bool IgnoreDamage = false;
-            bool InfiniteStamina = false;
-            bool NoFallDamage = false;
+            bool GodMode = false;
+            bool DemigodMode = false;
+            bool InfiniteOxygen = false;
+            bool MaxMedicinePouch = false;
+            bool StealthMode = false;
+            bool SuperDamage = false;
             bool InstantCharge = false;
-            bool InfiniteAmmo = false;
+            bool InfiniteWeaponStamina = false;
+            bool InfiniteFocus = false;
+            bool InfiniteValor = false;
+            bool InfiniteSkillDuration = false;
+            bool InfiniteReserveAmmo = false;
+            bool InfiniteClipAmmo = false;
             bool InfiniteArrows = false;
-            bool NoReload = false;
-            bool MountAnywhere = false;
-            bool AiVsAi = false;
             bool InfiniteJump = false;
             bool Noclip = false;
-            bool FreezeTime = false;
-            bool WeatherOverride = false;
-            bool RevealMap = false;
+            bool FreeCamera = false;
+            bool FreezeTrialTimer = false;
+            bool AutoNeutralFaction = false;
+            bool GameCompleted = false;
+            bool ApplyPhotoModeInGame = false;
             bool FreeCrafting = false;
             bool ResourceIds = false;
-            bool HardwareCursor = false;
+            bool HardwareCursor = true;
             bool DamageMultiplier = false;
             bool DefenseMultiplier = false;
             bool MovementSpeed = false;
             bool FallSpeed = false;
+            bool ExperienceMultiplier = false;
+            bool PauseGame = false;
+            bool PauseAI = false;
+            bool PauseDayNight = false;
+            bool DayNightCycle = true;
+            bool TimescaleOverride = false;
+            bool TimescaleInMenus = false;
+            bool LodOverride = false;
+            bool HasSavedPosition = false;
+            bool HasUndoPosition = false;
+            bool HasWaypoint = true;
+            bool InventoryWindow = false;
+            bool SpawnerWindow = false;
+            bool WeatherWindow = false;
+            bool LocationsWindow = false;
+            bool LogWindow = false;
+            bool DemoWindow = false;
             float Damage = 2.0f;
             float Defense = 2.0f;
+            float Experience = 2.0f;
             float Speed = 3.0f;
             float Jump = 5.0f;
             float Falling = 0.5f;
             float Time = 12.0f;
-            float Amount = 999.0f;
+            float Timescale = 1.0f;
+            float LodBias = 1.0f;
             float InterfaceScale = 1.0f;
-            int Weather = 0;
-            int Location = 0;
+            int ToolsAmount = 1;
+            int AmmoAmount = 1;
+            int ResourcesAmount = 1;
+            int SkillPoints = 1;
         };
 
         State g_State;
         Page g_Page = Page::Player;
         int g_Subtab = 0;
+        Editor g_Editor = Editor::None;
+        bool g_OpenEditor = false;
         float g_PageAnim = 1.0f;
         float g_Scale = 1.0f;
+        float g_DpiScale = 1.0f;
         ImFont* g_Regular = nullptr;
         ImFont* g_Bold = nullptr;
         std::unordered_map<ImGuiID, float> g_Anim;
 
         float S(float value) { return value * g_Scale; }
 
+        const char* T(const char* chinese, const char* english)
+        {
+            return g_State.Chinese ? chinese : english;
+        }
+
         bool PageNeedsPlayer(Page page)
         {
-            return page == Page::Player || page == Page::Movement || page == Page::Resources || page == Page::Teleport;
+            return page == Page::Player || page == Page::Resources;
         }
 
         float Ease(float current, float target, float speed)
@@ -202,10 +238,13 @@ namespace Preview
             w->DrawList->AddRectFilled(bb.Min, bb.Max, Col(Theme::FrameOn, a * .82f + h * .18f), S(5));
             const float lit = enabled ? std::max(a, h * .6f) : 0.0f;
             IconGlyph(w->DrawList, icon, bb.Min + ImVec2(S(18), S(19)), Col(Mix(Theme::Muted, Theme::Accent, lit)), .82f);
-            const ImVec2 ts = ImGui::CalcTextSize(label);
+            const float navFontSize = g_Regular ? g_Regular->FontSize : ImGui::GetFontSize();
+            const ImVec2 ts = g_Bold ? g_Bold->CalcTextSizeA(navFontSize, FLT_MAX, 0.0f, label) : ImGui::CalcTextSize(label);
             ImVec4 textColor = Mix(Theme::Muted, Theme::Text, lit);
             if (!enabled) textColor.w = .38f;
-            w->DrawList->AddText(bb.Min + ImVec2(S(40), (bb.GetHeight() - ts.y) * .5f), Col(textColor), label);
+            const ImVec2 textPos = bb.Min + ImVec2(S(40), (bb.GetHeight() - ts.y) * .5f);
+            if (g_Bold) w->DrawList->AddText(g_Bold, navFontSize, textPos, Col(textColor), label);
+            else w->DrawList->AddText(textPos, Col(textColor), label);
             if (!enabled)
             {
                 const ImVec2 lockCenter(bb.Max.x - S(13), bb.GetCenter().y + S(1));
@@ -249,8 +288,10 @@ namespace Preview
             a = Ease(a, selected ? 1.0f : 0.0f, 13.0f);
             h = Ease(h, hovered ? 1.0f : 0.0f, 18.0f);
             w->DrawList->AddRectFilled(bb.Min, bb.Max, Col(Theme::FrameOn, a * .82f + h * .14f), S(4), rounding);
-            const ImVec2 ts = ImGui::CalcTextSize(text);
-            w->DrawList->AddText(bb.GetCenter() - ts * .5f, Col(Mix(Theme::Muted, Theme::Text, std::max(a, h * .7f))), text);
+            const float fontSize = g_Regular ? g_Regular->FontSize : ImGui::GetFontSize();
+            const ImVec2 ts = g_Bold ? g_Bold->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text) : ImGui::CalcTextSize(text);
+            if (g_Bold) w->DrawList->AddText(g_Bold, fontSize, bb.GetCenter() - ts * .5f, Col(Mix(Theme::Muted, Theme::Text, std::max(a, h * .7f))), text);
+            else w->DrawList->AddText(bb.GetCenter() - ts * .5f, Col(Mix(Theme::Muted, Theme::Text, std::max(a, h * .7f))), text);
             return pressed;
         }
 
@@ -267,7 +308,8 @@ namespace Preview
             d->AddRect(p + ImVec2(0, S(13)), p + z, Col(Theme::Border), S(6));
             const ImVec2 ts = ImGui::CalcTextSize(title);
             d->AddRectFilled(p + ImVec2(S(9), S(5)), p + ImVec2(S(18) + ts.x, S(22)), Col(Theme::Window));
-            d->AddText(p + ImVec2(S(13), 0), Col(Theme::Muted, .78f), title);
+            if (g_Bold) d->AddText(g_Bold, ImGui::GetFontSize(), p + ImVec2(S(13), 0), Col(Theme::Muted, .82f), title);
+            else d->AddText(p + ImVec2(S(13), 0), Col(Theme::Muted, .78f), title);
             ImGui::SetCursorPos(ImVec2(S(12), S(30)));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, S(4)));
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(S(8), S(10)));
@@ -376,6 +418,102 @@ namespace Preview
             return changed;
         }
 
+        bool ActionRow(const char* idText, const char* text, const char* value, bool enabled = true)
+        {
+            ImGuiWindow* w = ImGui::GetCurrentWindow();
+            const ImGuiID id = w->GetID(idText);
+            const ImRect bb(w->DC.CursorPos, w->DC.CursorPos + ImVec2(ImGui::GetContentRegionAvail().x, S(29)));
+            ImGui::ItemSize(bb);
+            if (!ImGui::ItemAdd(bb, id)) return false;
+            bool hovered = false, held = false;
+            const bool pressed = enabled && ImGui::ButtonBehavior(bb, id, &hovered, &held);
+            float& h = Anim(id, 12, 0.0f);
+            h = Ease(h, hovered && enabled ? 1.0f : 0.0f, 18.0f);
+            w->DrawList->AddRectFilled(bb.Min, bb.Max, Col(Mix(Theme::Group, Theme::FrameOn, h * .72f)), S(4));
+            w->DrawList->AddRect(bb.Min, bb.Max, Col(Theme::Border), S(4));
+            ImVec4 labelColor = enabled ? Theme::Text : Theme::Muted;
+            if (!enabled) labelColor.w = .38f;
+            w->DrawList->AddText(bb.Min + ImVec2(S(9), (bb.GetHeight() - ImGui::GetFontSize()) * .5f), Col(labelColor), text);
+            const ImVec2 valueSize = ImGui::CalcTextSize(value);
+            const ImVec2 valuePos(bb.Max.x - valueSize.x - S(20), bb.GetCenter().y - valueSize.y * .5f);
+            w->DrawList->AddText(valuePos, Col(enabled ? Mix(Theme::Muted, Theme::Accent, h * .6f) : Theme::Muted, enabled ? 1.0f : .38f), value);
+            const ImVec2 arrow(bb.Max.x - S(8), bb.GetCenter().y);
+            w->DrawList->AddTriangleFilled(arrow + ImVec2(-S(3), -S(4)), arrow + ImVec2(-S(3), S(4)), arrow + ImVec2(S(2), 0), Col(Theme::Muted, enabled ? .85f : .25f));
+            return pressed;
+        }
+
+        void OpenEditor(Editor editor)
+        {
+            g_Editor = editor;
+            g_OpenEditor = true;
+        }
+
+        bool* EditorEnabledFlag()
+        {
+            switch (g_Editor)
+            {
+            case Editor::Defense: return &g_State.DefenseMultiplier;
+            case Editor::Damage: return &g_State.DamageMultiplier;
+            case Editor::Movement: return &g_State.MovementSpeed;
+            case Editor::Jump: return &g_State.InfiniteJump;
+            case Editor::Falling: return &g_State.FallSpeed;
+            case Editor::Experience: return &g_State.ExperienceMultiplier;
+            default: return nullptr;
+            }
+        }
+
+        float* EditorFloatValue()
+        {
+            switch (g_Editor)
+            {
+            case Editor::Defense: return &g_State.Defense;
+            case Editor::Damage: return &g_State.Damage;
+            case Editor::Movement: return &g_State.Speed;
+            case Editor::Jump: return &g_State.Jump;
+            case Editor::Falling: return &g_State.Falling;
+            case Editor::Experience: return &g_State.Experience;
+            default: return nullptr;
+            }
+        }
+
+        int* EditorIntegerValue()
+        {
+            switch (g_Editor)
+            {
+            case Editor::Tools: return &g_State.ToolsAmount;
+            case Editor::Ammo: return &g_State.AmmoAmount;
+            case Editor::Resources: return &g_State.ResourcesAmount;
+            case Editor::SkillPoints: return &g_State.SkillPoints;
+            default: return nullptr;
+            }
+        }
+
+        const char* EditorTitle()
+        {
+            switch (g_Editor)
+            {
+            case Editor::Defense: return T("防御倍率设置", "Defense multiplier");
+            case Editor::Damage: return T("伤害倍率设置", "Damage multiplier");
+            case Editor::Movement: return T("移动速度设置", "Movement speed");
+            case Editor::Jump: return T("无限跳高度设置", "Infinite jump height");
+            case Editor::Falling: return T("下降速度设置", "Falling speed");
+            case Editor::Tools: return T("修改工具数量", "Edit tools amount");
+            case Editor::Ammo: return T("修改弹药数量", "Edit ammunition amount");
+            case Editor::Resources: return T("修改资源数量", "Edit resources amount");
+            case Editor::Experience: return T("经验倍率设置", "Experience multiplier");
+            case Editor::SkillPoints: return T("修改技能点", "Edit skill points");
+            default: return T("数值设置", "Value editor");
+            }
+        }
+
+        const char* EnabledValue(bool enabled, float value, int decimals = 1)
+        {
+            static thread_local char buffer[32];
+            if (!enabled) return T("关闭", "Off");
+            std::snprintf(buffer, sizeof(buffer), decimals == 2 ? "%.2fx" : "%.1fx", value);
+            return buffer;
+        }
+
         void Line()
         {
             ImGui::Dummy(ImVec2(0, S(1)));
@@ -416,65 +554,78 @@ namespace Preview
                 {
                     if (g_Subtab == 0)
                     {
-                        BeginBox("survival", g_State.Chinese ? "生存状态" : "SURVIVAL", ImVec2(w, S(245)));
-                        Toggle("invincible", g_State.Chinese ? "无敌模式" : "Invincible", &g_State.Invincible);
-                        Toggle("health", g_State.Chinese ? "无限生命" : "Infinite health", &g_State.InfiniteHealth);
-                        Toggle("damage", g_State.Chinese ? "无视伤害判定" : "Ignore damage checks", &g_State.IgnoreDamage);
-                        Toggle("stamina", g_State.Chinese ? "无限体力" : "Infinite stamina", &g_State.InfiniteStamina);
-                        Toggle("fall", g_State.Chinese ? "免疫坠落伤害" : "No fall damage", &g_State.NoFallDamage);
+                        BeginBox("survival", T("生存状态", "SURVIVAL"), ImVec2(w, size.y));
+                        if (Toggle("god", T("完全无敌", "God mode"), &g_State.GodMode) && g_State.GodMode) g_State.DemigodMode = false;
+                        if (Toggle("demigod", T("半无敌模式", "Demigod mode"), &g_State.DemigodMode) && g_State.DemigodMode) g_State.GodMode = false;
+                        if (ActionRow("defense", T("防御倍率设置", "Defense multiplier"), EnabledValue(g_State.DefenseMultiplier, g_State.Defense))) OpenEditor(Editor::Defense);
+                        Toggle("oxygen", T("无限氧气", "Infinite oxygen"), &g_State.InfiniteOxygen);
+                        Toggle("medicine", T("药用浆果袋保持满额", "Keep medicine pouch full"), &g_State.MaxMedicinePouch);
+                        Toggle("stealth", T("隐身模式", "Stealth mode"), &g_State.StealthMode);
                         EndBox();
-                        BeginBox("actions", g_State.Chinese ? "角色动作" : "PLAYER ACTIONS", ImVec2(w, size.y - S(255)));
-                        Toggle("charge", g_State.Chinese ? "弓箭快速蓄力" : "Fast bow charge", &g_State.InstantCharge);
-                        Toggle("mount", g_State.Chinese ? "解除坐骑限制" : "Mount anywhere", &g_State.MountAnywhere);
-                        Toggle("aivsai", g_State.Chinese ? "允许 AI 互相伤害" : "Enable AI vs AI damage", &g_State.AiVsAi);
+                    }
+                    else if (g_Subtab == 1)
+                    {
+                        BeginBox("combat", T("战斗与能力", "COMBAT & ABILITIES"), ImVec2(w, size.y));
+                        Toggle("super-damage", T("超级伤害 / 一击必杀", "Super damage / one-hit kill"), &g_State.SuperDamage);
+                        if (ActionRow("damage-mult", T("伤害倍率设置", "Damage multiplier"), EnabledValue(g_State.DamageMultiplier, g_State.Damage))) OpenEditor(Editor::Damage);
+                        Toggle("charge", T("弓箭瞬间蓄力", "Instant bow charge"), &g_State.InstantCharge);
+                        Toggle("weapon-stamina", T("无限武器耐力", "Infinite weapon stamina"), &g_State.InfiniteWeaponStamina);
+                        Toggle("focus", T("无限专注", "Infinite focus"), &g_State.InfiniteFocus);
+                        Toggle("valor", T("无限勇气", "Infinite valor"), &g_State.InfiniteValor);
+                        Toggle("skill-duration", T("无限技能持续时间", "Infinite skill duration"), &g_State.InfiniteSkillDuration);
+                        EndBox();
+                    }
+                    else if (g_Subtab == 2)
+                    {
+                        BeginBox("movement", T("移动与探索", "MOVEMENT & EXPLORATION"), ImVec2(w, size.y));
+                        if (ActionRow("move-speed", T("移动速度设置", "Movement speed"), EnabledValue(g_State.MovementSpeed, g_State.Speed))) OpenEditor(Editor::Movement);
+                        if (ActionRow("jump-height", T("无限跳高度设置", "Infinite jump height"), EnabledValue(g_State.InfiniteJump, g_State.Jump))) OpenEditor(Editor::Jump);
+                        if (ActionRow("fall-speed", T("下降速度设置", "Falling speed"), EnabledValue(g_State.FallSpeed, g_State.Falling, 2))) OpenEditor(Editor::Falling);
+                        Toggle("noclip", T("穿墙模式（丶 / ~）", "Noclip (` / ~)"), &g_State.Noclip);
+                        Toggle("free-camera", T("自由镜头", "Free camera"), &g_State.FreeCamera);
                         EndBox();
                     }
                     else
                     {
-                        BeginBox("player-advanced", g_Subtab == 1 ? (g_State.Chinese ? "高级数值" : "ADVANCED VALUES") : (g_State.Chinese ? "快捷键" : "HOTKEYS"), ImVec2(w, size.y));
-                        if (g_Subtab == 1)
-                        {
-                            Toggle("damage-mult-enable", g_State.Chinese ? "启用伤害倍率" : "Enable damage multiplier", &g_State.DamageMultiplier);
-                            ImGui::BeginDisabled(!g_State.DamageMultiplier);
-                            Slider("damage-mult", g_State.Chinese ? "伤害倍率数值" : "Damage value", &g_State.Damage, 1, 10, "%.1fx");
-                            ImGui::EndDisabled();
-                            Line();
-                            Toggle("defense-mult-enable", g_State.Chinese ? "启用防御倍率" : "Enable defense multiplier", &g_State.DefenseMultiplier);
-                            ImGui::BeginDisabled(!g_State.DefenseMultiplier);
-                            Slider("defense-mult", g_State.Chinese ? "防御倍率数值" : "Defense value", &g_State.Defense, 1, 10, "%.1fx");
-                            ImGui::EndDisabled();
-                        }
-                        else
-                        {
-                            ImGui::TextColored(Theme::Muted, "INS"); ImGui::SameLine(S(100)); ImGui::TextUnformatted(g_State.Chinese ? "显示 / 隐藏菜单" : "Show / hide menu"); Line();
-                            ImGui::TextColored(Theme::Muted, "` / ~"); ImGui::SameLine(S(100)); ImGui::TextUnformatted(g_State.Chinese ? "穿墙模式" : "Noclip mode"); Line();
-                            ImGui::TextColored(Theme::Muted, "SPACE"); ImGui::SameLine(S(100)); ImGui::TextUnformatted(g_State.Chinese ? "踏空跳 / 上升" : "Air jump / ascend");
-                        }
+                        BeginBox("special", T("特殊与调试", "SPECIAL & DEBUG"), ImVec2(w, size.y));
+                        Toggle("trial", T("锁定试炼时间", "Freeze trial timer"), &g_State.FreezeTrialTimer);
+                        Toggle("neutral", T("自动中立阵营", "Automatic neutral faction"), &g_State.AutoNeutralFaction);
+                        Toggle("completed", T("模拟游戏已完成", "Simulate game completed"), &g_State.GameCompleted);
+                        Toggle("photo", T("游戏中应用拍照模式设置", "Apply photo settings in game"), &g_State.ApplyPhotoModeInGame);
                         EndBox();
                     }
                 },
                 [&](float w)
                 {
-                    BeginBox("weapons", g_Subtab == 0 ? (g_State.Chinese ? "武器与弹药" : "WEAPONS & AMMO") : (g_State.Chinese ? "状态与说明" : "STATUS & NOTES"), ImVec2(w, size.y));
-                    if (g_Subtab == 0)
+                    if (g_Subtab == 1)
                     {
-                        Toggle("ammo", g_State.Chinese ? "无限弹药" : "Infinite ammo", &g_State.InfiniteAmmo);
-                        Toggle("arrows", g_State.Chinese ? "无限箭矢与陷阱" : "Infinite arrows and traps", &g_State.InfiniteArrows);
-                        Toggle("reload", g_State.Chinese ? "无需装填" : "No reload", &g_State.NoReload);
+                        BeginBox("ammo", T("弹药", "AMMUNITION"), ImVec2(w, size.y));
+                        if (Toggle("reserve-ammo", T("无限备用弹药", "Infinite reserve ammo"), &g_State.InfiniteReserveAmmo) && g_State.InfiniteReserveAmmo) g_State.InfiniteClipAmmo = false;
+                        if (Toggle("clip-ammo", T("无限弹匣弹药", "Infinite clip ammo"), &g_State.InfiniteClipAmmo) && g_State.InfiniteClipAmmo) g_State.InfiniteReserveAmmo = false;
+                        Toggle("arrows", T("无限箭矢与陷阱", "Infinite arrows and traps"), &g_State.InfiniteArrows);
+                        Line();
+                        ImGui::TextWrapped("%s", T("备用弹药与弹匣弹药互斥；箭矢与陷阱可同时开启。", "Reserve and clip ammo are mutually exclusive; arrows and traps may remain enabled."));
+                        EndBox();
                     }
-                    else if (g_Subtab == 1)
+                    else if (g_Subtab == 2)
                     {
-                        ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", g_State.Chinese ? "DLL 已动态加载" : "DLL loaded dynamically");
-                        ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", g_State.Chinese ? "DirectX 12 渲染正常" : "DirectX 12 renderer ready");
-                        ImGui::TextColored(Theme::Muted, "%s", g_State.Chinese ? "数值修改默认关闭" : "Value modifiers default to off");
-                        ImGui::TextColored(Theme::Muted, "FPS  %.0f", ImGui::GetIO().Framerate);
+                        BeginBox("hotkeys", T("操作说明", "CONTROLS"), ImVec2(w, size.y));
+                        ImGui::TextColored(Theme::Muted, "INS"); ImGui::SameLine(S(105)); ImGui::TextUnformatted(T("显示 / 隐藏菜单", "Show / hide menu")); Line();
+                        ImGui::TextColored(Theme::Muted, "` / ~"); ImGui::SameLine(S(105)); ImGui::TextUnformatted(T("穿墙模式", "Noclip mode")); Line();
+                        ImGui::TextColored(Theme::Muted, "SPACE"); ImGui::SameLine(S(105)); ImGui::TextUnformatted(T("踏空跳 / 上升", "Air jump / ascend"));
+                        EndBox();
                     }
                     else
                     {
-                        ImGui::TextColored(Theme::Muted, "%s", g_State.Chinese ? "预览程序没有游戏功能。" : "The preview has no game functions.");
-                        ImGui::TextWrapped(g_State.Chinese ? "所有控件只使用本地模拟状态，用于检查视觉效果和动画。" : "All controls use local mock state for visual and animation testing.");
+                        BeginBox("status", T("状态与说明", "STATUS & NOTES"), ImVec2(w, size.y));
+                        ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", T("DLL 已动态加载", "DLL loaded dynamically"));
+                        ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", T("DirectX 12 渲染正常", "DirectX 12 renderer ready"));
+                        ImGui::TextColored(Theme::Muted, "%s", T("所有修改项默认关闭", "All modifiers default to off"));
+                        ImGui::TextColored(Theme::Muted, "FPS  %.0f", ImGui::GetIO().Framerate);
+                        Line();
+                        ImGui::TextWrapped("%s", T("预览只保存本地模拟状态，不读取或修改游戏内存。", "The preview only keeps local mock state and never accesses game memory."));
+                        EndBox();
                     }
-                    EndBox();
                 });
         }
 
@@ -483,84 +634,304 @@ namespace Preview
             TwoColumns(size,
                 [&](float w)
                 {
-                    const char* title = g_State.Chinese ? "主要设置" : "MAIN";
-                    BeginBox("main", title, ImVec2(w, size.y));
-                    if (g_Page == Page::Movement)
+                    BeginBox("main", T("主要设置", "MAIN"), ImVec2(w, size.y));
+                    if (g_Page == Page::Resources)
                     {
-                        Toggle("move-enable", g_State.Chinese ? "启用移动速度调整" : "Enable movement speed", &g_State.MovementSpeed);
-                        ImGui::BeginDisabled(!g_State.MovementSpeed);
-                        Slider("move", g_State.Chinese ? "移动速度倍率" : "Movement multiplier", &g_State.Speed, 1, 8, "%.1fx");
-                        ImGui::EndDisabled();
-                        Toggle("infinite-jump", g_State.Chinese ? "启用无限踏空跳" : "Enable infinite air jump", &g_State.InfiniteJump);
-                        ImGui::BeginDisabled(!g_State.InfiniteJump);
-                        Slider("jump", g_State.Chinese ? "跳跃高度倍率" : "Jump height multiplier", &g_State.Jump, 1, 20, "%.1f");
-                        ImGui::EndDisabled();
-                        Toggle("fall-enable", g_State.Chinese ? "启用下降速度调整" : "Enable falling speed", &g_State.FallSpeed);
-                        ImGui::BeginDisabled(!g_State.FallSpeed);
-                        Slider("fall", g_State.Chinese ? "下降速度倍率" : "Falling multiplier", &g_State.Falling, .1f, 3, "%.1fx");
-                        ImGui::EndDisabled();
-                        Toggle("noclip-main", g_State.Chinese ? "自由飞行穿墙" : "Free-flight noclip", &g_State.Noclip);
-                    }
-                    else if (g_Page == Page::Resources)
-                    {
-                        Slider("amount", g_State.Chinese ? "目标数量" : "Target amount", &g_State.Amount, 0, 9999, "%.0f");
-                        Toggle("craft", g_State.Chinese ? "无视制作与购买需求" : "Ignore crafting and purchase costs", &g_State.FreeCrafting);
-                        Toggle("ids", g_State.Chinese ? "显示内部资源 ID" : "Show internal resource IDs", &g_State.ResourceIds);
-                        FlatButton("apply", g_State.Chinese ? "应用模拟数值" : "Apply mock value", ImVec2(ImGui::GetContentRegionAvail().x, S(31)));
+                        if (ActionRow("inventory", T("玩家物品栏", "Player inventory"), T("打开", "Open"))) g_State.InventoryWindow = true;
+                        if (ActionRow("tools", T("修改工具数量", "Edit tools amount"), T("未启用", "Not active"))) OpenEditor(Editor::Tools);
+                        if (ActionRow("ammo", T("修改弹药数量", "Edit ammunition amount"), T("未启用", "Not active"))) OpenEditor(Editor::Ammo);
+                        if (ActionRow("resources", T("修改资源数量", "Edit resources amount"), T("未启用", "Not active"))) OpenEditor(Editor::Resources);
+                        Toggle("craft", T("无视制作与购买需求", "Ignore crafting and purchase costs"), &g_State.FreeCrafting);
+                        if (ActionRow("experience", T("经验倍率设置", "Experience multiplier"), EnabledValue(g_State.ExperienceMultiplier, g_State.Experience))) OpenEditor(Editor::Experience);
+                        FlatButton("grant-exp", T("获得大量经验", "Grant large amount of XP"), ImVec2(ImGui::GetContentRegionAvail().x, S(33)));
+                        if (ActionRow("skill-points", T("修改技能点", "Edit skill points"), T("未启用", "Not active"))) OpenEditor(Editor::SkillPoints);
                     }
                     else if (g_Page == Page::World)
                     {
-                        Toggle("freeze", g_State.Chinese ? "锁定世界时间" : "Freeze world time", &g_State.FreezeTime);
-                        Slider("time", g_State.Chinese ? "当前时间" : "Current time", &g_State.Time, 0, 24, "%.1fh");
-                        Toggle("weather", g_State.Chinese ? "覆盖当前天气" : "Override current weather", &g_State.WeatherOverride);
-                        Toggle("map", g_State.Chinese ? "显示完整地图" : "Reveal full map", &g_State.RevealMap);
+                        Toggle("pause-game", T("暂停游戏逻辑", "Pause game logic"), &g_State.PauseGame);
+                        Toggle("pause-ai", T("暂停 AI 处理", "Pause AI processing"), &g_State.PauseAI);
+                        ImGui::BeginDisabled(!g_State.InGame);
+                        Toggle("pause-day", T("暂停昼夜时间", "Pause day/night time"), &g_State.PauseDayNight);
+                        Toggle("day-cycle", T("启用昼夜循环", "Enable day/night cycle"), &g_State.DayNightCycle);
+                        Slider("time", T("当前时间", "Current time"), &g_State.Time, 0, 24, "%.1fh");
+                        ImGui::EndDisabled();
+                        Toggle("timescale-enable", T("时间倍率覆盖", "Timescale override"), &g_State.TimescaleOverride);
+                        Toggle("timescale-menus", T("菜单内保持时间倍率", "Keep timescale in menus"), &g_State.TimescaleInMenus);
+                        ImGui::BeginDisabled(!g_State.TimescaleOverride);
+                        Slider("timescale", T("时间倍率", "Timescale"), &g_State.Timescale, .1f, 5, "%.2fx");
+                        ImGui::EndDisabled();
+                        Toggle("lod-enable", T("LOD 偏差覆盖", "LOD bias override"), &g_State.LodOverride);
+                        ImGui::BeginDisabled(!g_State.LodOverride);
+                        Slider("lod", T("LOD 偏差", "LOD bias"), &g_State.LodBias, 0, 1, "%.2f");
+                        ImGui::EndDisabled();
                     }
-                    else if (g_Page == Page::Teleport)
+                    else if (g_Page == Page::Developer)
                     {
-                        const char* placesZh[] = { "基地", "炙矛地", "削链镇", "竞技场", "旧金山遗迹" };
-                        const char* placesEn[] = { "The Base", "Scalding Spear", "Chainscrape", "The Arena", "San Francisco Ruins" };
-                        const char* const* places = g_State.Chinese ? placesZh : placesEn;
-                        Combo("location", g_State.Chinese ? "目标位置" : "Destination", &g_State.Location, places, IM_ARRAYSIZE(placesZh));
-                        FlatButton("teleport", g_State.Chinese ? "执行模拟传送" : "Run mock teleport", ImVec2(ImGui::GetContentRegionAvail().x, S(31)));
+                        if (ActionRow("log", T("显示日志窗口", "Show log window"), T("打开", "Open"))) g_State.LogWindow = true;
+                        if (ActionRow("demo", T("显示 ImGui 演示窗口", "Show ImGui demo"), T("打开", "Open"))) g_State.DemoWindow = true;
+                        ActionRow("rtti", T("导出 RTTI 结构", "Export RTTI structures"), T("执行", "Run"));
+                        ActionRow("components", T("导出玩家组件", "Export player components"), T("执行", "Run"), g_State.InGame);
                     }
                     else
                     {
-                        Toggle("hardware", g_State.Chinese ? "硬件鼠标光标" : "Hardware mouse cursor", &g_State.HardwareCursor);
-                        Slider("ui", g_State.Chinese ? "界面缩放" : "Interface scale", &g_State.InterfaceScale, .85f, 1.5f, "%.2fx");
+                        Toggle("hardware", T("硬件鼠标光标", "Hardware mouse cursor"), &g_State.HardwareCursor);
+                        Slider("ui", T("界面缩放", "Interface scale"), &g_State.InterfaceScale, .85f, 1.5f, "%.2fx");
                     }
                     EndBox();
                 },
                 [&](float w)
                 {
-                    BeginBox("secondary", g_State.Chinese ? "状态与预览" : "STATUS & PREVIEW", ImVec2(w, size.y));
+                    BeginBox("secondary", g_Page == Page::World ? T("传送与工具", "TELEPORT & TOOLS") : T("状态与预览", "STATUS & PREVIEW"), ImVec2(w, size.y));
                     if (g_Page == Page::World)
                     {
-                        const char* weatherZh[] = { "晴朗", "多云", "雨天", "沙尘暴" };
-                        const char* weatherEn[] = { "Clear", "Cloudy", "Rain", "Sandstorm" };
-                        const char* const* weather = g_State.Chinese ? weatherZh : weatherEn;
-                        Combo("weather-select", g_State.Chinese ? "天气" : "Weather", &g_State.Weather, weather, IM_ARRAYSIZE(weatherZh));
+                        ActionRow("quick-save", T("强制快速保存", "Force quick save"), T("执行", "Run"), g_State.InGame);
+                        ActionRow("quick-load", T("读取上一存档", "Load previous save"), T("执行", "Run"), g_State.InGame);
+                        if (ActionRow("save-position", T("保存当前位置", "Save current position"), T("执行", "Run"), g_State.InGame)) g_State.HasSavedPosition = true;
+                        ActionRow("saved-position", T("传送到保存位置", "Teleport to saved position"), T("执行", "Run"), g_State.InGame && g_State.HasSavedPosition);
+                        ActionRow("undo-teleport", T("撤销上次传送", "Undo last teleport"), T("执行", "Run"), g_State.InGame && g_State.HasUndoPosition);
+                        if (ActionRow("waypoint", T("传送到地图标记点", "Teleport to waypoint"), T("执行", "Run"), g_State.InGame && g_State.HasWaypoint)) g_State.HasUndoPosition = true;
+                        ActionRow("camera-position", T("传送到自由镜头位置", "Teleport to free-camera position"), T("执行", "Run"), g_State.InGame);
+                        if (ActionRow("locations", T("预设地点", "Preset locations"), T("打开", "Open"), g_State.InGame)) g_State.LocationsWindow = true;
+                        if (ActionRow("spawner", T("实体生成器", "Entity spawner"), T("打开", "Open"), g_State.InGame)) g_State.SpawnerWindow = true;
+                        if (ActionRow("weather", T("天气设置", "Weather setup"), T("打开", "Open"))) g_State.WeatherWindow = true;
                     }
                     else
                     {
-                        ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", g_State.Chinese ? "DLL 已加载" : "DLL loaded");
-                        ImGui::TextColored(Theme::Muted, "%s", g_State.Chinese ? "仅使用本地模拟状态" : "Local mock state only");
+                        ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "%s", T("DLL 已加载", "DLL loaded"));
+                        ImGui::TextColored(Theme::Muted, "%s", T("仅使用本地模拟状态", "Local mock state only"));
                         Line();
-                        ImGui::TextWrapped(g_State.Chinese ? "本页用于检查控件比例、字体、弹层和动画，不访问游戏内存。" : "This page tests control proportions, typography, popups and animation without game memory access.");
+                        ImGui::TextWrapped("%s", T("本页用于检查控件比例、字体、弹层和动画，不访问游戏内存。", "This page tests control proportions, typography, popups and animation without game memory access."));
+                        if (g_Page == Page::Developer)
+                        {
+                            Line();
+                            ImGui::TextUnformatted(T("项目版本", "Project version"));
+                            ImGui::TextColored(Theme::Muted, "0.18 / HFW Gameplay Tweaks");
+                        }
                     }
                     EndBox();
                 });
+        }
+
+        void RenderValueEditor()
+        {
+            if (g_OpenEditor)
+            {
+                ImGui::OpenPopup("##value-editor");
+                g_OpenEditor = false;
+            }
+
+            ImGui::SetNextWindowSize(ImVec2(S(520), 0), ImGuiCond_Appearing);
+            ImGui::SetNextWindowPos(ImGui::GetIO().DisplaySize * .5f, ImGuiCond_Appearing, ImVec2(.5f, .5f));
+            if (!ImGui::BeginPopupModal("##value-editor", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
+                return;
+
+            if (g_Bold)
+            {
+                ImGui::PushFont(g_Bold);
+                ImGui::TextUnformatted(EditorTitle());
+                ImGui::PopFont();
+            }
+            else ImGui::TextUnformatted(EditorTitle());
+            ImGui::Separator();
+
+            if (float* value = EditorFloatValue())
+            {
+                float minimum = 1.0f, maximum = 100.0f;
+                if (g_Editor == Editor::Movement) { minimum = .1f; maximum = 10.0f; }
+                else if (g_Editor == Editor::Jump) { minimum = 1.0f; maximum = 50.0f; }
+                else if (g_Editor == Editor::Falling) { minimum = .1f; maximum = 5.0f; }
+                ImGui::TextWrapped("%s", g_Editor == Editor::Jump
+                    ? T("输入高度倍率；1 为原版，默认输入 5。确认后才启用无限跳。", "Enter a height multiplier; 1 is vanilla and 5 is the preset. Infinite jump is enabled only after confirmation.")
+                    : g_Editor == Editor::Movement
+                        ? T("输入移动速度倍率；1 为原版，默认输入 3。确认后才启用。", "Enter a movement multiplier; 1 is vanilla and 3 is the preset. It is enabled only after confirmation.")
+                        : g_Editor == Editor::Falling
+                            ? T("输入下降速度倍率；1 为原版，默认输入 0.5。确认后才启用。", "Enter a falling multiplier; 1 is vanilla and 0.5 is the preset. It is enabled only after confirmation.")
+                            : T("输入倍率并确认后才会启用；关闭后恢复游戏默认计算。", "The multiplier is enabled only after confirmation; disabling restores the game calculation."));
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                ImGui::InputFloat("##float-value", value, .1f, 1.0f, "%.2f");
+                *value = std::clamp(*value, minimum, maximum);
+            }
+            else if (int* value = EditorIntegerValue())
+            {
+                ImGui::TextWrapped("%s", T("输入目标数量并确认。数量修改只执行一次，不会持续锁定。", "Enter a target amount and confirm. The change runs once and is not locked."));
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                ImGui::InputInt("##integer-value", value, 1, 10);
+                *value = std::clamp(*value, 1, g_Editor == Editor::SkillPoints ? 9999 : 999999);
+            }
+            ImGui::Spacing();
+            const float gap = S(10), buttonWidth = (ImGui::GetContentRegionAvail().x - gap) * .5f;
+            if (ImGui::Button(T("确认", "Confirm"), ImVec2(buttonWidth, S(38))))
+            {
+                if (bool* enabled = EditorEnabledFlag()) *enabled = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine(0, gap);
+            const bool active = EditorEnabledFlag() && *EditorEnabledFlag();
+            if (ImGui::Button(active ? T("关闭修改", "Disable") : T("取消", "Cancel"), ImVec2(buttonWidth, S(38))))
+            {
+                if (bool* enabled = EditorEnabledFlag()) *enabled = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        void RenderInventoryWindow()
+        {
+            if (!g_State.InventoryWindow) return;
+            static char filter[96] {};
+            static bool onlyOwned = true;
+            static bool localized = true;
+            static bool showIds = false;
+            static int selected = -1;
+            static int editCount = 0;
+            static std::array<int, 8> counts { 24, 2, 1, 24, 361, 50, 6, 2 };
+            constexpr std::array<const char*, 8> namesZh { "编织线", "苦叶", "药剂袋", "药用浆果", "金属碎片", "金属腐蚀罐", "金属骨", "铁锭" };
+            constexpr std::array<const char*, 8> namesEn { "Braided Wire", "Bitter Leaf", "Potion Pouch", "Medicinal Berry", "Metal Shards", "Metalbite Sac", "Metal Bone", "Iron Ingot" };
+
+            ImGui::SetNextWindowSize(ImVec2(S(900), S(650)), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowPos(ImGui::GetIO().DisplaySize * .5f, ImGuiCond_FirstUseEver, ImVec2(.5f, .5f));
+            if (ImGui::Begin(T("玩家物品栏###InventoryPreview", "Player inventory###InventoryPreview"), &g_State.InventoryWindow, ImGuiWindowFlags_NoCollapse))
+            {
+                ImGui::TextColored(ImVec4(1, .74f, .25f, 1), "%s", T("警告：生成、添加或删除任务物品可能永久破坏游戏进度。", "Warning: adding or removing quest items may permanently damage progression."));
+                ImGui::SetNextItemWidth(-FLT_MIN); ImGui::InputTextWithHint("##inventory-filter", T("筛选（包含、-排除）", "Filter (include, -exclude)"), filter, sizeof(filter));
+                ImGui::Checkbox(T("仅显示玩家物品栏中的物品", "Only show owned items"), &onlyOwned); ImGui::SameLine();
+                ImGui::Checkbox(T("显示游戏本地化名称", "Show localized names"), &localized); ImGui::SameLine();
+                ImGui::Checkbox(T("显示内部资源 ID", "Show internal resource IDs"), &showIds);
+                ImGui::TextColored(ImVec4(.55f, .82f, 1, 1), "%s", T("单击物品行可输入目标总数量；输入 0 会删除该物品。", "Click an item row to enter its target total; enter 0 to remove it."));
+                const int columns = showIds ? 3 : 2;
+                if (ImGui::BeginTable("##inventory-table", columns, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable))
+                {
+                    ImGui::TableSetupColumn(T("名称", "Name"), ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableSetupColumn(T("数量", "Count"), ImGuiTableColumnFlags_WidthFixed, S(90));
+                    if (showIds) ImGui::TableSetupColumn(T("内部资源 ID", "Internal resource ID"), ImGuiTableColumnFlags_WidthFixed, S(260));
+                    ImGui::TableHeadersRow();
+                    for (int i = 0; i < static_cast<int>(counts.size()); ++i)
+                    {
+                        ImGui::PushID(i); ImGui::TableNextRow(); ImGui::TableSetColumnIndex(0);
+                        const char* name = g_State.Chinese ? namesZh[i] : namesEn[i];
+                        if (ImGui::Selectable(name, false, ImGuiSelectableFlags_SpanAllColumns)) { selected = i; editCount = counts[i]; ImGui::OpenPopup("##inventory-count"); }
+                        ImGui::TableSetColumnIndex(1); ImGui::Text("%d", counts[i]);
+                        if (showIds) { ImGui::TableSetColumnIndex(2); ImGui::Text("%08X-0000-4000-8000-%012X", i + 1, i + 0x100); }
+                        ImGui::PopID();
+                    }
+                    ImGui::EndTable();
+                }
+                ImGui::SetNextWindowSize(ImVec2(S(440), 0), ImGuiCond_Appearing);
+                if (ImGui::BeginPopupModal("##inventory-count", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                {
+                    ImGui::Text("%s: %s", T("物品", "Item"), selected >= 0 ? (g_State.Chinese ? namesZh[selected] : namesEn[selected]) : "-");
+                    ImGui::TextUnformatted(T("输入目标总数量（0 - 999999）", "Enter target total (0 - 999999)"));
+                    ImGui::SetNextItemWidth(-FLT_MIN); ImGui::InputInt("##target-count", &editCount, 1, 10); editCount = std::clamp(editCount, 0, 999999);
+                    if (ImGui::Button(T("确认修改", "Confirm"), ImVec2(S(190), S(38)))) { if (selected >= 0) counts[selected] = editCount; ImGui::CloseCurrentPopup(); }
+                    ImGui::SameLine(); if (ImGui::Button(T("取消", "Cancel"), ImVec2(S(190), S(38)))) ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
+                }
+            }
+            ImGui::End();
+        }
+
+        void RenderSpawnerWindow()
+        {
+            if (!g_State.SpawnerWindow) return;
+            static int selected = 0, count = 1, location = 0, faction = 0;
+            const char* entitiesZh[] = { "猛爪兽 1", "追猎者 1", "叛军骑手 1", "火焰滑翔者 1", "跃鞭兽 1", "雷霆牙 1" };
+            const char* entitiesEn[] = { "Clawstrider 1", "Stalker 1", "Rebel Rider 1", "Fire Sunwing 1", "Leaplasher 1", "Thunderjaw 1" };
+            const char* factionsZh[] = { "<未指定阵营>", "Player", "Neutral", "EnemyToAll" };
+            const char* factionsEn[] = { "<No faction>", "Player", "Neutral", "EnemyToAll" };
+            ImGui::SetNextWindowSize(ImVec2(S(900), S(650)), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin(T("实体生成器###SpawnerPreview", "Entity spawner###SpawnerPreview"), &g_State.SpawnerWindow, ImGuiWindowFlags_NoCollapse))
+            {
+                const float left = ImGui::GetContentRegionAvail().x * .56f;
+                ImGui::BeginChild("##entity-list", ImVec2(left, -FLT_MIN), true);
+                ImGui::TextUnformatted(T("筛选（包含、-排除）", "Filter (include, -exclude)")); static char search[80] {}; ImGui::InputText("##entity-search", search, sizeof(search));
+                for (int i = 0; i < IM_ARRAYSIZE(entitiesZh); ++i)
+                    if (ImGui::Selectable(g_State.Chinese ? entitiesZh[i] : entitiesEn[i], selected == i)) selected = i;
+                ImGui::EndChild(); ImGui::SameLine(); ImGui::BeginChild("##spawn-settings", ImVec2(0, -FLT_MIN), true);
+                ImGui::TextUnformatted(T("生成设置", "SPAWN SETTINGS")); ImGui::Separator();
+                ImGui::TextUnformatted(T("生成数量", "Spawn count")); ImGui::InputInt("##spawn-count", &count); count = std::max(count, 1);
+                Combo("faction", T("玩家阵营", "Faction"), &faction, g_State.Chinese ? factionsZh : factionsEn, IM_ARRAYSIZE(factionsZh));
+                ImGui::TextUnformatted(T("生成位置", "Spawn position")); ImGui::RadioButton(T("玩家", "Player"), &location, 0); ImGui::SameLine(); ImGui::RadioButton(T("准星", "Crosshair"), &location, 1); ImGui::RadioButton(T("自定义", "Custom"), &location, 2);
+                if (location == 2) { static float xyz[3] {}; ImGui::InputFloat3("XYZ", xyz); }
+                ImGui::Spacing(); ImGui::Button(T("生成", "Spawn"), ImVec2(ImGui::GetContentRegionAvail().x, S(38)));
+                ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - S(85)));
+                ImGui::TextColored(ImVec4(1, .75f, .3f, 1), "%s", T("警告：人形和脚本实体可能导致游戏崩溃。", "Warning: humanoid and scripted entities may crash the game."));
+                ImGui::EndChild();
+            }
+            ImGui::End();
+        }
+
+        void RenderWeatherWindow()
+        {
+            if (!g_State.WeatherWindow) return;
+            static int selected = 0;
+            const char* weatherZh[] = { "晴朗海岸", "多云山地", "强降雨", "沙尘暴", "夜间薄雾" };
+            const char* weatherEn[] = { "Clear Coast", "Cloudy Mountains", "Heavy Rain", "Sandstorm", "Night Fog" };
+            ImGui::SetNextWindowSize(ImVec2(S(720), S(560)), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin(T("天气设置###WeatherPreview", "Weather setup###WeatherPreview"), &g_State.WeatherWindow, ImGuiWindowFlags_NoCollapse))
+            {
+                static char filter[80] {}; ImGui::InputTextWithHint("##weather-filter", T("筛选（包含、-排除）", "Filter (include, -exclude)"), filter, sizeof(filter));
+                Toggle("weather-ids", T("显示内部资源 ID（高级）", "Show internal resource IDs"), &g_State.ResourceIds);
+                if (ImGui::BeginListBox("##weather-list", ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - S(80))))
+                {
+                    for (int i = 0; i < IM_ARRAYSIZE(weatherZh); ++i) if (ImGui::Selectable(g_State.Chinese ? weatherZh[i] : weatherEn[i], selected == i)) selected = i;
+                    ImGui::EndListBox();
+                }
+                ImGui::Button(T("应用天气", "Apply weather"), ImVec2(S(240), S(36)));
+                ImGui::TextColored(ImVec4(1, .75f, .3f, 1), "%s", T("注意：部分名称缺失，可以在配置文件中补充。", "Note: missing names may be supplied in the configuration file."));
+            }
+            ImGui::End();
+        }
+
+        void RenderLocationsWindow()
+        {
+            if (!g_State.LocationsWindow) return;
+            const char* const locationsZh[] = {
+                "HZD - 子午城入口", "HZD - 尖塔", "HZD - 炼铸厂 ZETA", "HFW - 序章教学区域",
+                "HFW - 贫瘠之光山地要塞", "HFW - 炙炎海岸首领战区域", "HFW - 法尔·泽尼斯基地"
+            };
+            const char* const locationsEn[] = {
+                "HZD - Meridian Entrance", "HZD - The Spire", "HZD - Cauldron ZETA", "HFW - Prologue Tutorial",
+                "HFW - Barren Light Fortress", "HFW - Burning Shores Boss Area", "HFW - Far Zenith Base"
+            };
+            ImGui::SetNextWindowSize(ImVec2(S(720), S(560)), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin(T("预设地点###LocationsPreview", "Preset locations###LocationsPreview"), &g_State.LocationsWindow, ImGuiWindowFlags_NoCollapse))
+            {
+                ImGui::TextColored(Theme::Muted, "%s", T("选择地点后执行模拟传送。", "Select a location to run a mock teleport."));
+                for (int i = 0; i < IM_ARRAYSIZE(locationsZh); ++i)
+                {
+                    ImGui::PushID(i);
+                    ActionRow("##location", g_State.Chinese ? locationsZh[i] : locationsEn[i], T("传送", "Teleport"));
+                    ImGui::PopID();
+                }
+            }
+            ImGui::End();
+        }
+
+        void RenderDeveloperWindows()
+        {
+            if (g_State.LogWindow)
+            {
+                ImGui::SetNextWindowSize(ImVec2(S(760), S(440)), ImGuiCond_FirstUseEver);
+                if (ImGui::Begin(T("模组日志###LogPreview", "Mod log###LogPreview"), &g_State.LogWindow))
+                {
+                    ImGui::TextColored(Theme::Muted, "[info] Initializing HFW Gameplay Tweaks");
+                    ImGui::TextColored(ImVec4(.38f, .78f, .55f, 1), "[info] Trainer signatures initialized");
+                    ImGui::TextColored(Theme::Muted, "[info] DirectX 12 overlay ready");
+                }
+                ImGui::End();
+            }
+            if (g_State.DemoWindow) ImGui::ShowDemoWindow(&g_State.DemoWindow);
         }
 
         const char* PageName()
         {
             switch (g_Page)
             {
-            case Page::Player: return g_State.Chinese ? "玩家" : "Player";
-            case Page::Movement: return g_State.Chinese ? "移动" : "Movement";
-            case Page::Resources: return g_State.Chinese ? "资源" : "Resources";
-            case Page::World: return g_State.Chinese ? "世界" : "World";
-            case Page::Teleport: return g_State.Chinese ? "传送" : "Teleport";
-            case Page::Settings: return g_State.Chinese ? "设置" : "Settings";
+            case Page::Player: return T("玩家功能", "Player features");
+            case Page::Resources: return T("资源与成长", "Resources & progression");
+            case Page::World: return T("世界与传送", "World & teleport");
+            case Page::Developer: return T("开发者工具", "Developer tools");
+            case Page::Settings: return T("界面设置", "Interface settings");
             }
             return "HFW";
         }
@@ -576,11 +947,12 @@ namespace Preview
 
     void ApplyStyle(float scale)
     {
-        g_Scale = std::clamp(scale, .9f, 1.6f);
+        g_DpiScale = std::clamp(scale, .9f, 1.75f);
+        g_Scale = g_DpiScale;
         ImGui::StyleColorsDark();
         ImGuiStyle& st = ImGui::GetStyle();
-        st.WindowPadding = ImVec2(S(8), S(8)); st.FramePadding = ImVec2(S(8), S(5)); st.ItemSpacing = ImVec2(S(8), S(8)); st.ItemInnerSpacing = ImVec2(S(6), S(4));
-        st.ScrollbarSize = S(10); st.GrabMinSize = S(9); st.WindowRounding = S(7); st.ChildRounding = S(5); st.PopupRounding = S(5); st.FrameRounding = S(4); st.ScrollbarRounding = S(6);
+        st.WindowPadding = ImVec2(S(10), S(10)); st.FramePadding = ImVec2(S(10), S(6)); st.ItemSpacing = ImVec2(S(9), S(9)); st.ItemInnerSpacing = ImVec2(S(7), S(5));
+        st.ScrollbarSize = S(12); st.GrabMinSize = S(11); st.WindowRounding = S(8); st.ChildRounding = S(6); st.PopupRounding = S(6); st.FrameRounding = S(5); st.ScrollbarRounding = S(7);
         st.WindowBorderSize = 1; st.ChildBorderSize = 0; st.FrameBorderSize = 0;
         auto& c = st.Colors;
         c[ImGuiCol_Text] = Theme::Text; c[ImGuiCol_TextDisabled] = Theme::Muted; c[ImGuiCol_WindowBg] = Theme::Window; c[ImGuiCol_ChildBg] = ImVec4(0, 0, 0, 0); c[ImGuiCol_PopupBg] = Theme::Window;
@@ -592,17 +964,19 @@ namespace Preview
     {
         ImGuiIO& io = ImGui::GetIO();
         const float s = std::clamp(scale, .9f, 1.6f);
-        ImFontConfig cfg {}; cfg.PixelSnapH = true; cfg.OversampleH = 2; cfg.OversampleV = 2; cfg.RasterizerMultiply = 1.1f;
+        ImFontConfig cfg {}; cfg.PixelSnapH = true; cfg.OversampleH = 3; cfg.OversampleV = 2; cfg.RasterizerMultiply = 1.18f;
         const ImWchar* ranges = io.Fonts->GetGlyphRangesChineseSimplifiedCommon();
+        const float regularSize = std::round(17.5f * s);
+        const float boldSize = std::round(23.0f * s);
         for (const auto& p : std::array<std::filesystem::path, 3>{ L"C:/Windows/Fonts/msyh.ttc", L"C:/Windows/Fonts/segoeui.ttf", L"C:/Windows/Fonts/simhei.ttf" })
         {
-            std::error_code e; if (std::filesystem::is_regular_file(p, e)) { g_Regular = io.Fonts->AddFontFromFileTTF(p.string().c_str(), 15.5f * s, &cfg, ranges); if (g_Regular) break; }
+            std::error_code e; if (std::filesystem::is_regular_file(p, e)) { g_Regular = io.Fonts->AddFontFromFileTTF(p.string().c_str(), regularSize, &cfg, ranges); if (g_Regular) break; }
         }
         for (const auto& p : std::array<std::filesystem::path, 2>{ L"C:/Windows/Fonts/msyhbd.ttc", L"C:/Windows/Fonts/seguisb.ttf" })
         {
-            std::error_code e; if (std::filesystem::is_regular_file(p, e)) { g_Bold = io.Fonts->AddFontFromFileTTF(p.string().c_str(), 21.0f * s, &cfg, ranges); if (g_Bold) break; }
+            std::error_code e; if (std::filesystem::is_regular_file(p, e)) { g_Bold = io.Fonts->AddFontFromFileTTF(p.string().c_str(), boldSize, &cfg, ranges); if (g_Bold) break; }
         }
-        if (!g_Regular) { cfg.SizePixels = 15.5f * s; g_Regular = io.Fonts->AddFontDefault(&cfg); }
+        if (!g_Regular) { cfg.SizePixels = regularSize; g_Regular = io.Fonts->AddFontDefault(&cfg); }
         if (!g_Bold) g_Bold = g_Regular;
         io.FontDefault = g_Regular;
     }
@@ -610,6 +984,7 @@ namespace Preview
     void RenderMenu(bool& visible, bool& requestExit)
     {
         ImGuiIO& io = ImGui::GetIO();
+        g_Scale = g_DpiScale;
         Backdrop(io.DisplaySize);
         if (!visible)
         {
@@ -620,9 +995,10 @@ namespace Preview
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) requestExit = true;
 
-        const float fit = std::min({ g_Scale, (io.DisplaySize.x - 36) / 940.0f, (io.DisplaySize.y - 36) / 660.0f });
-        const ImVec2 menuSize(940 * fit, 660 * fit);
-        const float sidebar = 220 * fit, top = 64 * fit;
+        const float fit = std::min({ g_DpiScale, (io.DisplaySize.x - 36) / 1080.0f, (io.DisplaySize.y - 36) / 740.0f });
+        g_Scale = fit;
+        const ImVec2 menuSize(1080 * fit, 740 * fit);
+        const float sidebar = 245 * fit, top = 70 * fit;
         ImGui::SetNextWindowSize(menuSize, ImGuiCond_Always);
         ImGui::SetNextWindowPos(io.DisplaySize * .5f, ImGuiCond_FirstUseEver, ImVec2(.5f, .5f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0)); ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
@@ -637,9 +1013,13 @@ namespace Preview
             d->AddText(p + ImVec2(S(66), S(18)), Col(Theme::Text), "HFW TOOLS"); d->AddText(p + ImVec2(S(66), S(38)), Col(Theme::Muted, .65f), g_State.Chinese ? "界面预览" : "Interface preview");
 
             ImGui::SetCursorPos(ImVec2(S(14), S(78))); ImGui::BeginChild("##nav", ImVec2(sidebar - S(28), z.y - S(148)), false, ImGuiWindowFlags_NoScrollbar);
-            Category(g_State.Chinese ? "角色" : "PLAYER"); Nav("player", Icon::User, g_State.Chinese ? "玩家" : "Player", Page::Player, g_State.InGame); Nav("move", Icon::Move, g_State.Chinese ? "移动与镜头" : "Movement", Page::Movement, g_State.InGame);
-            ImGui::Dummy(ImVec2(0, S(9))); Category(g_State.Chinese ? "游戏" : "GAME"); Nav("resources", Icon::Bag, g_State.Chinese ? "资源与物品" : "Resources", Page::Resources, g_State.InGame); Nav("world", Icon::Globe, g_State.Chinese ? "世界" : "World", Page::World); Nav("teleport", Icon::Pin, g_State.Chinese ? "传送" : "Teleport", Page::Teleport, g_State.InGame);
-            ImGui::Dummy(ImVec2(0, S(9))); Category(g_State.Chinese ? "通用" : "COMMON"); Nav("settings", Icon::Gear, g_State.Chinese ? "设置" : "Settings", Page::Settings); ImGui::EndChild();
+            Category(T("修改器", "TRAINER"));
+            Nav("player", Icon::User, T("玩家功能", "Player features"), Page::Player, g_State.InGame);
+            Nav("resources", Icon::Bag, T("资源与成长", "Resources & progression"), Page::Resources, g_State.InGame);
+            Nav("world", Icon::Globe, T("世界与传送", "World & teleport"), Page::World);
+            ImGui::Dummy(ImVec2(0, S(9))); Category(T("系统", "SYSTEM"));
+            Nav("developer", Icon::Move, T("开发者工具", "Developer tools"), Page::Developer);
+            Nav("settings", Icon::Gear, T("界面设置", "Interface settings"), Page::Settings); ImGui::EndChild();
 
             d->AddLine(p + ImVec2(0, z.y - S(66)), p + ImVec2(sidebar, z.y - S(66)), Col(Theme::Border)); d->AddCircleFilled(p + ImVec2(S(35), z.y - S(33)), S(17), Col(Theme::FrameOn), 24); IconGlyph(d, Icon::User, p + ImVec2(S(35), z.y - S(33)), Col(Theme::Accent), .78f);
             d->AddText(p + ImVec2(S(60), z.y - S(46)), Col(Theme::Text), g_State.Chinese ? "本地预览" : "Local preview"); d->AddText(p + ImVec2(S(60), z.y - S(26)), Col(Theme::Muted, .72f), g_State.Chinese ? "DX12 / 模拟状态" : "DX12 / Mock state");
@@ -647,17 +1027,18 @@ namespace Preview
             ImGui::SetCursorPos(ImVec2(sidebar + S(22), S(17))); Icon save = Icon::Save; FlatButton("save", g_State.Chinese ? "保存" : "Save", ImVec2(S(92), S(31)), &save);
             if (g_Page == Page::Player)
             {
-                ImGui::SetCursorPos(ImVec2(sidebar + S(130), S(17))); const char* zh[] = { "常用", "高级", "快捷键" }; const char* en[] = { "General", "Advanced", "Hotkeys" };
-                for (int i = 0; i < 3; ++i)
+                ImGui::SetCursorPos(ImVec2(sidebar + S(130), S(17))); const char* zh[] = { "状态", "战斗", "移动", "其他" }; const char* en[] = { "Status", "Combat", "Move", "Other" };
+                for (int i = 0; i < 4; ++i)
                 {
-                    ImGui::PushID(i); ImDrawFlags flags = i == 0 ? ImDrawFlags_RoundCornersLeft : (i == 2 ? ImDrawFlags_RoundCornersRight : ImDrawFlags_None);
-                    if (Subtab("##subtab", g_State.Chinese ? zh[i] : en[i], g_Subtab == i, ImVec2(S(90), S(31)), flags) && g_Subtab != i) { g_Subtab = i; g_PageAnim = 0; }
-                    ImGui::PopID(); if (i != 2) ImGui::SameLine(0, 0);
+                    ImGui::PushID(i); ImDrawFlags flags = i == 0 ? ImDrawFlags_RoundCornersLeft : (i == 3 ? ImDrawFlags_RoundCornersRight : ImDrawFlags_None);
+                    if (Subtab("##subtab", g_State.Chinese ? zh[i] : en[i], g_Subtab == i, ImVec2(S(76), S(31)), flags) && g_Subtab != i) { g_Subtab = i; g_PageAnim = 0; }
+                    ImGui::PopID(); if (i != 3) ImGui::SameLine(0, 0);
                 }
             }
             ImGui::SetCursorPos(ImVec2(z.x - S(318), S(17))); if (FlatButton("session", g_State.InGame ? (g_State.Chinese ? "游戏内" : "In game") : (g_State.Chinese ? "大厅" : "Lobby"), ImVec2(S(126), S(31)))) g_State.InGame = !g_State.InGame;
             ImGui::SetCursorPos(ImVec2(z.x - S(176), S(17))); if (FlatButton("lang", g_State.Chinese ? "中 / EN" : "EN / 中", ImVec2(S(92), S(31)))) g_State.Chinese = !g_State.Chinese; ImGui::SameLine(0, S(8)); if (FlatButton("close", "X", ImVec2(S(34), S(31)))) requestExit = true;
-            d->AddText(p + ImVec2(sidebar + S(22), top + S(16)), Col(Theme::Muted, .65f), PageName());
+            if (g_Bold) d->AddText(g_Bold, g_Regular ? g_Regular->FontSize : ImGui::GetFontSize(), p + ImVec2(sidebar + S(22), top + S(15)), Col(Theme::Muted, .78f), PageName());
+            else d->AddText(p + ImVec2(sidebar + S(22), top + S(16)), Col(Theme::Muted, .65f), PageName());
 
             g_PageAnim = Ease(g_PageAnim, 1, 9.5f); const float contentTop = top + S(42); const ImVec2 cp(sidebar + S(22), contentTop + S(7) * (1 - g_PageAnim)); const ImVec2 cs(z.x - sidebar - S(44), z.y - contentTop - S(20));
             ImGui::SetCursorPos(cp); ImGui::PushStyleVar(ImGuiStyleVar_Alpha, std::clamp(g_PageAnim, .02f, 1.0f)); ImGui::BeginChild("##content", cs, false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -668,6 +1049,12 @@ namespace Preview
             if (g_Page == Page::Player) PlayerPage(pageSize); else StandardPage(pageSize);
             if (unavailable) ImGui::EndDisabled();
             ImGui::EndChild(); ImGui::PopStyleVar();
+            RenderValueEditor();
+            RenderInventoryWindow();
+            RenderSpawnerWindow();
+            RenderWeatherWindow();
+            RenderLocationsWindow();
+            RenderDeveloperWindows();
         }
         ImGui::End(); ImGui::PopStyleColor(); ImGui::PopStyleVar();
     }

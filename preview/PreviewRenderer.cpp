@@ -292,7 +292,7 @@ namespace Preview
         };
         RegisterClassExW(&windowClass);
 
-        RECT rect { 0, 0, 1440, 900 };
+        RECT rect { 0, 0, 1600, 1000 };
         AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
         g_Window = CreateWindowW(
             windowClass.lpszClassName,
