@@ -433,7 +433,7 @@ namespace Preview
             w->DrawList->AddRect(bb.Min, bb.Max, Col(Theme::Border), S(4));
             ImVec4 labelColor = enabled ? Theme::Text : Theme::Muted;
             if (!enabled) labelColor.w = .38f;
-            w->DrawList->AddText(bb.Min + ImVec2(S(9), (bb.GetHeight() - ImGui::GetFontSize()) * .5f), Col(labelColor), text);
+            w->DrawList->AddText(bb.Min + ImVec2(0, (bb.GetHeight() - ImGui::GetFontSize()) * .5f), Col(labelColor), text);
             const ImVec2 valueSize = ImGui::CalcTextSize(value);
             const ImVec2 valuePos(bb.Max.x - valueSize.x - S(20), bb.GetCenter().y - valueSize.y * .5f);
             w->DrawList->AddText(valuePos, Col(enabled ? Mix(Theme::Muted, Theme::Accent, h * .6f) : Theme::Muted, enabled ? 1.0f : .38f), value);
