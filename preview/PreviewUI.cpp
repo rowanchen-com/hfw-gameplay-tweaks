@@ -958,6 +958,13 @@ namespace Preview
         c[ImGuiCol_Text] = Theme::Text; c[ImGuiCol_TextDisabled] = Theme::Muted; c[ImGuiCol_WindowBg] = Theme::Window; c[ImGuiCol_ChildBg] = ImVec4(0, 0, 0, 0); c[ImGuiCol_PopupBg] = Theme::Window;
         c[ImGuiCol_Border] = Theme::Border; c[ImGuiCol_FrameBg] = Theme::FrameOff; c[ImGuiCol_FrameBgHovered] = Theme::FrameOn; c[ImGuiCol_FrameBgActive] = Theme::FrameOn;
         c[ImGuiCol_Button] = Theme::Button; c[ImGuiCol_ButtonHovered] = Theme::ButtonHover; c[ImGuiCol_ButtonActive] = Theme::FrameOn; c[ImGuiCol_Header] = ImVec4(1, 1, 1, .03f); c[ImGuiCol_HeaderHovered] = ImVec4(1, 1, 1, .06f); c[ImGuiCol_HeaderActive] = ImVec4(1, 1, 1, .09f); c[ImGuiCol_Separator] = Theme::Border; c[ImGuiCol_NavHighlight] = Theme::Accent;
+        c[ImGuiCol_TitleBg] = Theme::Sidebar; c[ImGuiCol_TitleBgActive] = Theme::FrameOn; c[ImGuiCol_TitleBgCollapsed] = Theme::Sidebar;
+        c[ImGuiCol_CheckMark] = Theme::Accent; c[ImGuiCol_SliderGrab] = Theme::Accent; c[ImGuiCol_SliderGrabActive] = ImVec4(.48f, .66f, 1.0f, 1.0f);
+        c[ImGuiCol_TableHeaderBg] = Theme::FrameOn; c[ImGuiCol_TableRowBg] = Theme::Window; c[ImGuiCol_TableRowBgAlt] = Theme::Group;
+        c[ImGuiCol_TableBorderStrong] = ImVec4(1, 1, 1, .08f); c[ImGuiCol_TableBorderLight] = Theme::Border;
+        c[ImGuiCol_ScrollbarBg] = Theme::Sidebar; c[ImGuiCol_ScrollbarGrab] = Theme::FrameOn; c[ImGuiCol_ScrollbarGrabHovered] = Theme::ButtonHover; c[ImGuiCol_ScrollbarGrabActive] = Theme::Accent;
+        c[ImGuiCol_ResizeGrip] = ImVec4(0, 0, 0, 0); c[ImGuiCol_ResizeGripHovered] = ImVec4(Theme::Accent.x, Theme::Accent.y, Theme::Accent.z, .45f); c[ImGuiCol_ResizeGripActive] = Theme::Accent;
+        c[ImGuiCol_ModalWindowDimBg] = ImVec4(.035f, .045f, .065f, .76f);
     }
 
     void LoadFonts(float scale)
@@ -965,7 +972,7 @@ namespace Preview
         ImGuiIO& io = ImGui::GetIO();
         const float s = std::clamp(scale, .9f, 1.6f);
         ImFontConfig cfg {}; cfg.PixelSnapH = true; cfg.OversampleH = 3; cfg.OversampleV = 2; cfg.RasterizerMultiply = 1.18f;
-        const ImWchar* ranges = io.Fonts->GetGlyphRangesChineseSimplifiedCommon();
+        const ImWchar* ranges = io.Fonts->GetGlyphRangesChineseFull();
         const float regularSize = std::round(17.5f * s);
         const float boldSize = std::round(23.0f * s);
         for (const auto& p : std::array<std::filesystem::path, 3>{ L"C:/Windows/Fonts/msyh.ttc", L"C:/Windows/Fonts/segoeui.ttf", L"C:/Windows/Fonts/simhei.ttf" })
@@ -1050,12 +1057,12 @@ namespace Preview
             if (unavailable) ImGui::EndDisabled();
             ImGui::EndChild(); ImGui::PopStyleVar();
             RenderValueEditor();
-            RenderInventoryWindow();
-            RenderSpawnerWindow();
-            RenderWeatherWindow();
-            RenderLocationsWindow();
-            RenderDeveloperWindows();
         }
         ImGui::End(); ImGui::PopStyleColor(); ImGui::PopStyleVar();
+        RenderInventoryWindow();
+        RenderSpawnerWindow();
+        RenderWeatherWindow();
+        RenderLocationsWindow();
+        RenderDeveloperWindows();
     }
 }
